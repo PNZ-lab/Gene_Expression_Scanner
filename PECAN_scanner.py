@@ -14,10 +14,12 @@ There are two applications of this script:
 	2. Replace 'target' and 'target2' in section 5 and run that cell
 		- Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
 
+Optionally, the script can perform a separate coloring and calculation of an input column and hit using the PECAN_clinical_reference.tsv
+	- e.g. (group==TAL1) or (ETP status==ETP)
+	- Important: The calculation for the subset is in addition to the normal data - that is the black trendline and R includes the subset
+
 '''
 
-'/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/contrast_Taz_v_ctrl.tsv'
-'/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/contrast_ATAC_Taz_v_ctrl.tsv'
 #%% ===========================================================================
 # 2. Setup and settings
 # =============================================================================
@@ -40,13 +42,12 @@ df_PECAN  = pd.read_csv(PECAN_in, sep='\t')
 clin_df   = pd.read_csv(clin_data, sep='\t')
 top_n     = 10 # E.g. 10 will generate graphs for the 5 most positive and most negatively correlated genes
 
-#%%
-#Optional
+#%% Optional
 print_corr_genes = False # Genes above and below breakpoints can be written directly to console
 write_files      = True # Turns on/off the writing of csv and pngs
 subanalysis_do   = True # Turns on/off the coloring and separate R calculation of data based on a clinical parameter
-subanalysis_col  = 'group'
-subanalysis_hit  = 'NKX2_1'
+subanalysis_col  = 'Gender'
+subanalysis_hit  = 'Male'
 #%% ===========================================================================
 # 3. Functions
 # =============================================================================
@@ -107,14 +108,14 @@ def Grapher(gene1, gene2):
 	Y_pred = model.predict(Xs)
 
 	ax, fig = plt.subplots(figsize=(8,8), dpi=200)
-	plt.plot(values1, Y_pred, color='black', label='R=%f, p=%f' %(r_value, p_value))
+	plt.plot(values1, Y_pred, color='black', label='All: R=%.2f, p=%f' %(r_value, p_value))
 	if subanalysis_do:
-		plt.plot(values1_etp, Y_pred_etp, color='red', label='%s: R=%f, p=%f' % (subanalysis_hit, r_value_etp, p_value_etp))
+		plt.plot(values1_etp, Y_pred_etp, color='red', label='%s: R=%.2f, p=%f' % (subanalysis_hit, r_value_etp, p_value_etp))
 	plt.scatter(values1, values2, color=sample_colors, alpha=0.3)
 	plt.xlabel(gene1 + ' (FPKM)', fontsize=18)
 	plt.ylabel(gene2 + ' (FPKM)', fontsize=18)
 	plt.tick_params(axis='both', labelsize=16)
-	plt.title('PECAN: %s v %s' %(gene1, gene2), fontsize=22)
+	plt.title('PECAN expression: %s v %s' %(gene1, gene2), fontsize=22)
 	plt.legend(fontsize=16)
 	file_name = 'PECAN_correlation_%s_v_%s.png' %(gene1, gene2)
 	WriteFile(file_name)
@@ -238,5 +239,5 @@ for target in targets:
 #Overwrite 'target' and 'target2' abd run this cell
 #File is saved in out_dir/[target]
 target  = 'KDM6B'
-target2 = 'SPI1'
+target2 = 'NFKB2'
 Grapher(target, target2)
