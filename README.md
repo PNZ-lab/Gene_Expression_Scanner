@@ -8,3 +8,6 @@ There are two applications of this script:
 	2. Replace 'target' and 'target2' in section 5 and run that cell
 		- Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
 ```
+
+![image](https://github.com/user-attachments/assets/7e027f59-77fb-42e4-96fd-a19409ab2db7)
+
