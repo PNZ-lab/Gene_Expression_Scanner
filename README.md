@@ -9,5 +9,14 @@ There are two applications of this script:
 		- Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
 ```
 
+Graph produced with Section 4 (with accompanying .csv):
+Input one gene and scan all other genes for correlations between their expression levels to the target gene.
 ![image](https://github.com/user-attachments/assets/7e027f59-77fb-42e4-96fd-a19409ab2db7)
 
+Graph produced for a single comparison:
+R and p-values are calculated using Pearson's R.
+![image](https://github.com/user-attachments/assets/93c5ce2d-4f2b-4afa-900b-89d564917d85)
+
+Graph produced for a single comparison using subanalysis_do=True.
+Statistic and p-value calculated using Mannwhitney U test.
+![image](https://github.com/user-attachments/assets/02d20bd9-f1f3-405b-af4b-19a53773a81c)
