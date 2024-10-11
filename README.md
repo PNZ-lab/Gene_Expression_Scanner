@@ -10,15 +10,15 @@ There are two applications of this script:
 
 
 ## Graph produced with Section 4 (with accompanying .csv):
-    - Input one gene and scan all other genes for correlations between their expression levels to the target gene. <br>
-    - Statistic and p-value calculated using Mannwhitney U test.
+- Input one gene and scan all other genes for correlations (Pearson's R) between their expression levels to the target gene. <br>
+- Statistic and p-value calculated using Mannwhitney U test.
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/7e027f59-77fb-42e4-96fd-a19409ab2db7">
 <br>
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/c2f8dde5-1570-4936-a130-4129f171e2da">
 
 ## Graph produced for a single comparison:
-    - R and p-values are calculated using Pearson's R.
+- R and p-values are calculated using Pearson's R.
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/93c5ce2d-4f2b-4afa-900b-89d564917d85">
 
