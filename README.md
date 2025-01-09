@@ -23,4 +23,11 @@ There are two applications of this script:
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/93c5ce2d-4f2b-4afa-900b-89d564917d85">
 
 ## Graph produced for a single comparison using subanalysis_do=True:
+Here:
+```python
+subanalysis_do=True
+subanalysis_col='ETP status'
+subanalysis_hit='ETP'
+```
+
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/02d20bd9-f1f3-405b-af4b-19a53773a81c">
