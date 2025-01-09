@@ -8,6 +8,7 @@ There are two applications of this script:
 2. Replace 'target' and 'target2' in section 5 and run that cell
     - Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
 
+Optionally, this script can perform a separate analysis in the same graph for a subset of the cohort based on clinical data.
 
 ## Graph produced with Section 4 (with accompanying .csv):
 - Input one gene and scan all other genes for correlations (Pearson's R) between their expression levels to the target gene. <br>
