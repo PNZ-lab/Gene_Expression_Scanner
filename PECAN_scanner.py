@@ -37,9 +37,10 @@ from scipy.stats import pearsonr, mannwhitneyu
 import os
 from KTC_functions import KTC_GetGeneSet
 
+
 #Initialization
 PECAN_in  = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/Expression_Pecan.txt' # PECAN FPKM data
-PECAN_in  = '/Volumes/kachrist/shares/cmgg_pnlab/Kasper/Data/Interesting_Lists/Expression_Pecan.txt' # PECAN FPKM data
+PECAN_in  = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/Expression_Pecan.txt' # PECAN FPKM data
 clin_data = '/Users/kasperthorhaugechristensen/Library/CloudStorage/OneDrive-UGent/PNG lab/Kasper/PECAN_scanner/PECAN_clinical_reference.tsv'
 out_dir   = '/Users/kasperthorhaugechristensen/Desktop/Dumpbox' # Directory where files and images are written. Subdirectories for individual genes are created
 df_PECAN  = pd.read_csv(PECAN_in, sep='\t')
@@ -279,7 +280,7 @@ for target in targets:
 # =============================================================================
 #Overwrite 'target' and 'target2' abd run this cell
 #File is saved in out_dir/[target]
-target  = 'IL4R'
-target2 = 'IL4'
+#DHFR, NAMPT, IDO1, NAPRT1
+target  = 'DHFR'
+target2 = 'NAMPT'
 Grapher(target, target2)
-
