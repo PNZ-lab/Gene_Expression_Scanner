@@ -34,6 +34,7 @@ from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 from kneed import KneeLocator
 from scipy.stats import pearsonr, mannwhitneyu
+import seaborn as sns
 import os
 from KTC_functions import KTC_GetGeneSet
 
@@ -284,3 +285,59 @@ for target in targets:
 target  = 'DHFR'
 target2 = 'NAMPT'
 Grapher(target, target2)
+
+#%% ===========================================================================
+# 6. Analyze levels of expression across 
+# =============================================================================
+
+from collections import defaultdict
+import pandas as pd
+
+def SubsetBoxplotter(gene, PECAN_col):
+    if gene not in df_PECAN['Gene'].values:
+        print(f"Gene '{gene}' not found in df_PECAN.")
+        return
+    
+    if PECAN_col not in clin_df.columns:
+        print(f"Column '{PECAN_col}' not found in clin_df.")
+        return
+
+    pecan_samples = df_PECAN.columns[1:].tolist()
+    values = df_PECAN.loc[df_PECAN['Gene'] == gene].iloc[0, 1:].tolist()
+
+    subtype_dict = defaultdict(list)
+
+    clin_lookup = clin_df.set_index('RNAseq_id_D')
+    for i, sample in enumerate(pecan_samples):
+        if sample in clin_lookup.index:
+            subtype = clin_lookup.loc[sample, PECAN_col]
+            subtype_dict[subtype].append(values[i])
+
+    data = pd.DataFrame([
+        {'Subtype': subtype, 'Expression': expression}
+        for subtype, expressions in subtype_dict.items()
+        for expression in expressions
+    ])
+
+    if data.empty:
+        print(f"No matching data found for gene {gene}.")
+        return
+
+    plt.figure(figsize=(8, 6), dpi=200)
+    sns.boxplot(data=data, x='Subtype', y='Expression', palette='pastel', showfliers=False)
+    sns.stripplot(data=data, x='Subtype', y='Expression', color='black', alpha=0.6, jitter=True)
+
+    plt.title(f'PeCan expression of {gene} in patients grouped by column: "{PECAN_col}"', fontsize=14)
+    plt.xlabel(PECAN_col, fontsize=12)
+    plt.ylabel('Expression (FPKM)', fontsize=12)
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
+    plt.ylim(0, None)
+
+    plt.tight_layout()
+    plt.show()
+
+
+gene     = 'DHFR'
+clin_col = 'Maturation stage'
+SubsetBoxplotter(gene, clin_col)
