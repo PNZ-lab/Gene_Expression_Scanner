@@ -13,6 +13,8 @@ There are two applications of this script:
 		- All genes with their R- and p-values will be written to a csv together with their position relative to the breakpoints
 	2. Replace 'target' and 'target2' in section 5 and run that cell
 		- Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
+	3. Replace 'gene' and 'clin_col' in cell 6 and run that cell
+		Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
 
 Optionally, the script can perform a separate coloring and calculation of an input column and hit using the PECAN_clinical_reference.tsv
 	- e.g. (group==TAL1) or (ETP status==ETP)
@@ -338,6 +340,6 @@ def SubsetBoxplotter(gene, PECAN_col):
     plt.show()
 
 
-gene     = 'DHFR'
+gene     = 'EZH2'
 clin_col = 'Maturation stage'
 SubsetBoxplotter(gene, clin_col)
