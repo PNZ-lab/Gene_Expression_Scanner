@@ -38,20 +38,20 @@ subanalysis_hit='ETP'
 
 ## Graphs produced with Section 6:
 ```
+gene     = 'METTL3'
+clin_col = 'group'
+SubsetBoxplotter(gene, clin_col, True, False, 'pastel')
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/57f2e61d-ed08-4f5d-8139-7bb871dc08ea">
+
+```
 gene     = 'DHFR'
 clin_col = 'ETP status'
 SubsetBoxplotter(gene, clin_col)
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/ecb2a8cd-af11-40e9-bc2a-2c945adb4f78">
-
-```
-gene     = 'DHFR'
-clin_col = 'Maturation stage'
-SubsetBoxplotter(gene, clin_col)
-```
-
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/761e8914-10ca-4d9c-a757-ce215293c6e3">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/9c77e48e-1b53-468f-9cd6-a367b6c34db9">
 
 
 
