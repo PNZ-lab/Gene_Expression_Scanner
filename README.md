@@ -48,7 +48,7 @@ SubsetBoxplotter(gene, clin_col, True, False, 'pastel')
 ```
 gene     = 'DHFR'
 clin_col = 'ETP status'
-SubsetBoxplotter(gene, clin_col)
+SubsetBoxplotter(gene, clin_col, True, False)
 ```
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/9c77e48e-1b53-468f-9cd6-a367b6c34db9">
