@@ -267,7 +267,7 @@ gene_set = KTC_GetGeneSet(['CPT2','ACAT1','OXCT1','BDH1','SLC2A1','SLC16A1','UCP
 
 
 #Targets is a list of gene names who will have correlations for all other genes calculated (top hits will be )
-targets = ['CDK4']
+targets = ['IGF2BP2']
 
 for target in targets:
     bottom_genes, top_genes = top_n_comparisons(target, gene_set, label)
@@ -284,16 +284,19 @@ for target in targets:
 #Overwrite 'target' and 'target2' abd run this cell
 #File is saved in out_dir/[target]
 #DHFR, NAMPT, IDO1, NAPRT1
-target  = 'DHFR'
-target2 = 'NAMPT'
+target  = 'IGF2BP2'
+target2 = 'SP1'
 Grapher(target, target2)
 
 #%% ===========================================================================
-# 6. Analyze levels of expression across 
+# 6. Analyze levels of expression across clinical parameters
 # =============================================================================
-
-from collections import defaultdict
+from statannotations.Annotator import Annotator
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from itertools import combinations
+from collections import defaultdict
 
 def SubsetBoxplotter(gene, PECAN_col):
     if gene not in df_PECAN['Gene'].values:
@@ -325,21 +328,62 @@ def SubsetBoxplotter(gene, PECAN_col):
         print(f"No matching data found for gene {gene}.")
         return
 
-    plt.figure(figsize=(8, 6), dpi=200)
-    sns.boxplot(data=data, x='Subtype', y='Expression', palette='pastel', showfliers=False)
-    sns.stripplot(data=data, x='Subtype', y='Expression', color='black', alpha=0.6, jitter=True)
+    # Plot the boxplot and stripplot
+    plt.figure(figsize=(10, 8), dpi=200)
+    sns.boxplot(data=data, x='Subtype', y='Expression', palette='gray', showfliers=False)
+    sns.stripplot(
+        data=data,
+        x='Subtype',
+        y='Expression',
+        facecolor='white',
+        edgecolor='black',
+        linewidth=0.8,
+        alpha=0.6,
+        jitter=True
+    )
 
-    plt.title(f'PeCan expression of {gene} in patients grouped by column: "{PECAN_col}"', fontsize=14)
+    # Specify the pairs to compare
+    pairs = list(combinations(data['Subtype'].unique(), 2))
+
+    # Create Annotator and calculate p-values using statannotations
+    annotator = Annotator(plt.gca(), pairs, data=data, x='Subtype', y='Expression')
+
+    annotator.configure(test='t-test_ind', text_format='star', loc='inside', verbose=2)
+    annotator.hide_non_significant = True
+    # Apply annotations for significant pairs
+    _, results = annotator.apply_and_annotate()
+
+    # Filter out insignificant pairs based on p-value threshold (e.g., p < 0.05)
+    significant_pairs = []
+    for idx, res in enumerate(results):
+        p_value = res.data.pvalue  # Extract p-value from the result
+        if p_value < 0.05:  # Only include significant p-values
+            significant_pairs.append(pairs[idx])  # Use the pair index to get the corresponding pair
+
+
+    # Set the plot title and labels
+    plt.title(f'PeCan expression of {gene} in patients grouped by column: \"{PECAN_col}\"', fontsize=14)
     plt.xlabel(PECAN_col, fontsize=12)
     plt.ylabel('Expression (FPKM)', fontsize=12)
-    plt.xticks(fontsize=10)
+    plt.xticks(rotation=45, fontsize=10)
     plt.yticks(fontsize=10)
-    plt.ylim(0, None)
 
     plt.tight_layout()
     plt.show()
 
+clin_cols = ['Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx']
 
-gene     = 'EZH2'
-clin_col = 'Maturation stage'
+gene     = 'METTL3'
+clin_col = 'group'
 SubsetBoxplotter(gene, clin_col)
+
+
+
+
+
+#%% 6b Creating a plot for each meaningful clinical parameter
+gene = 'IGF2BP2'
+for cc in clin_cols:
+    SubsetBoxplotter(gene, cc)
+
+#%%
