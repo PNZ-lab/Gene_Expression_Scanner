@@ -21,10 +21,30 @@ Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written
 <br>
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/c2f8dde5-1570-4936-a130-4129f171e2da">
 
-## Graph produced for a single comparison (Section 6):
+## Graphs produced for a single comparison (Section 5):
 - R and p-values are calculated using Pearson's R.
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/93c5ce2d-4f2b-4afa-900b-89d564917d85">
+### Basic comparison of two genes for all patients
+
+```python
+target  = 'HNRNPC'
+target2 = 'COPS4'
+Grapher(target, target2)
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/eec534b5-cbfa-4c65-90f0-6dc93f1323e1">
+
+### split_by_subtypes==True produces plots per subtype, show_equation==True displays slope and intersect
+
+```python
+target  = 'HNRNPC'
+target2 = 'MYC'
+Grapher(target, target2, split_by_subtype=True, show_equation=True)
+```
+
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/7ebd4cee-fc17-4941-886c-41cf66b2aa00">
+
 
 ## Graph produced for a single comparison using subanalysis_do=True:
 Here:
@@ -36,7 +56,9 @@ subanalysis_hit='ETP'
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/02d20bd9-f1f3-405b-af4b-19a53773a81c">
 
-## Graphs produced with Section 6:
+## Expression levels with patients split based on a clinical parameter (Section 6):
+
+### Basic boxplot with gene expression split by ETP status
 ```
 gene     = 'DHFR'
 clin_col = 'ETP status'
@@ -45,13 +67,15 @@ SubsetBoxplotter(gene, clin_col)
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/9c77e48e-1b53-468f-9cd6-a367b6c34db9">
 
+### perform_statistics and write_file toggle showing significance and saving the plot, _palette changes color scheme
+
 ```
 gene     = 'METTL3'
 clin_col = 'group'
-SubsetBoxplotter(gene, clin_col, True, False, 'pastel')
+SubsetBoxplotter(gene, clin_col, perform_statistics=False, write_file=False, _palette='pastel')
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/57f2e61d-ed08-4f5d-8139-7bb871dc08ea">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/49c7ee2c-bd1f-4bd1-ad40-e24c9064601c">
 
 
 
