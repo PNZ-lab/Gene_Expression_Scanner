@@ -67,15 +67,15 @@ SubsetBoxplotter(gene, clin_col)
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/9c77e48e-1b53-468f-9cd6-a367b6c34db9">
 
-### perform_statistics and write_file toggle showing significance and saving the plot, _palette changes color scheme
+### perform_statistics and write_file toggle showing significance and saving the plot, _palette changes color scheme, order specificies the order of the boxplots
 
 ```
 gene     = 'METTL3'
 clin_col = 'group'
-SubsetBoxplotter(gene, clin_col, perform_statistics=False, write_file=False, _palette='pastel')
+SubsetBoxplotter(gene, clin_col, perform_statistics=False, write_file=False, _palette='pastel', order=['ETP', 'nearETP', 'notETP'])
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/49c7ee2c-bd1f-4bd1-ad40-e24c9064601c">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/3f1c704b-4935-4675-8176-2bb70f4e9b3a">
 
 
 
