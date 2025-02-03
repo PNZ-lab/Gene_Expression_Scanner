@@ -11,7 +11,7 @@ There are three applications of this script:
 3. Replace 'gene' and 'clin_col' in cell 6 and run that cell 
     - Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
 
-Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written to compare levels of expression across different levels of invasion of the central nervous system of patients in the PeCan dataset.
+Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written to compare levels of expression across different levels of invasion of the central nervous system of patients in the PeCan dataset. Also - some of the functionalities of this script may rely on KTC_functions.py which you can find on this GitHub.
 
 ## Graph produced with Section 4 (with accompanying .csv):
 - Input one gene and scan all other genes for correlations (Pearson's R) between their expression levels to the target gene. <br>
@@ -21,10 +21,30 @@ Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written
 <br>
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/c2f8dde5-1570-4936-a130-4129f171e2da">
 
-## Graph produced for a single comparison (Section 6):
+## Graphs produced for a single comparison (Section 5):
 - R and p-values are calculated using Pearson's R.
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/93c5ce2d-4f2b-4afa-900b-89d564917d85">
+### Basic comparison of two genes for all patients
+
+```python
+target  = 'HNRNPC'
+target2 = 'COPS4'
+Grapher(target, target2)
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/eec534b5-cbfa-4c65-90f0-6dc93f1323e1">
+
+### split_by_subtypes==True produces plots per subtype, show_equation==True displays slope and intersect
+
+```python
+target  = 'HNRNPC'
+target2 = 'MYC'
+Grapher(target, target2, split_by_subtype=True, show_equation=True)
+```
+
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/7ebd4cee-fc17-4941-886c-41cf66b2aa00">
+
 
 ## Graph produced for a single comparison using subanalysis_do=True:
 Here:
@@ -36,22 +56,28 @@ subanalysis_hit='ETP'
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/02d20bd9-f1f3-405b-af4b-19a53773a81c">
 
-## Graphs produced with Section 6:
+## Expression levels with patients split based on a clinical parameter (Section 6):
+
+### Basic boxplot with gene expression split by ETP status
 ```
 gene     = 'DHFR'
 clin_col = 'ETP status'
 SubsetBoxplotter(gene, clin_col)
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/ecb2a8cd-af11-40e9-bc2a-2c945adb4f78">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/9c77e48e-1b53-468f-9cd6-a367b6c34db9">
+
+### perform_statistics and write_file toggle showing significance and saving the plot, _palette changes color scheme, order specificies the order of the boxplots
 
 ```
-gene     = 'DHFR'
-clin_col = 'Maturation stage'
-SubsetBoxplotter(gene, clin_col)
+gene     = 'METTL3'
+clin_col = 'group'
+SubsetBoxplotter(gene, clin_col, perform_statistics=False, write_file=False, _palette='pastel', order=['ETP', 'nearETP', 'notETP'])
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/761e8914-10ca-4d9c-a757-ce215293c6e3">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/3f1c704b-4935-4675-8176-2bb70f4e9b3a">
+
+
 
 
 
