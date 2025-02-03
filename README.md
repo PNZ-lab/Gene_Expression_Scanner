@@ -11,7 +11,7 @@ There are three applications of this script:
 3. Replace 'gene' and 'clin_col' in cell 6 and run that cell 
     - Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
 
-Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written to compare levels of expression across different levels of invasion of the central nervous system of patients in the PeCan dataset.
+Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written to compare levels of expression across different levels of invasion of the central nervous system of patients in the PeCan dataset. Also - some of the functionalities of this script may rely on KTC_functions.py which you can find on this GitHub.
 
 ## Graph produced with Section 4 (with accompanying .csv):
 - Input one gene and scan all other genes for correlations (Pearson's R) between their expression levels to the target gene. <br>
