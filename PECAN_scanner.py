@@ -53,9 +53,9 @@ top_n     = 2 # E.g. 10 will generate graphs for the 5 most positive and most ne
 #%% Optional
 print_corr_genes = False # Genes above and below breakpoints can be written directly to console
 write_files      = True # Turns on/off the writing of csv and pngs
-subanalysis_do   = False # Turns on/off the coloring and separate Pearson's R calculation of data based on a clinical parameter
 log_scale        = False
 show_breakpoint  = False # Identify and label breakpoints with Kneedle
+subanalysis_do   = False # Turns on/off the coloring and separate Pearson's R calculation of data based on a clinical parameter
 subanalysis_col  = 'CNS_at_Dx' 
 subanalysis_hit  = 'CNS 3' 
 #%% ===========================================================================
@@ -63,15 +63,16 @@ subanalysis_hit  = 'CNS 3'
 # =============================================================================
 
 def WriteFile(name):
+	print(name)
 	out_dir_target = os.path.join(out_dir, target)
 	if not os.path.exists(out_dir_target):
 		os.makedirs(out_dir_target)
-	if name.endswith('png'):
+	if name.endswith('png') or name.endswith('svg'):
 		plt.savefig(os.path.join(out_dir_target, name))
 		print('file created: %s' %(os.path.join(out_dir_target, name)))
 
 # This function is called elsewhere to create pairwise correlation plots between two genes
-def Grapher(gene1, gene2):
+def Grapher(gene1, gene2, split_by_subtype=False, show_equation=False):
     values1 = df_PECAN.loc[df_PECAN['Gene'] == gene1].iloc[0, 1:].tolist()
     values2 = df_PECAN.loc[df_PECAN['Gene'] == gene2].iloc[0, 1:].tolist()
     if log_scale:
@@ -79,93 +80,79 @@ def Grapher(gene1, gene2):
         values2 = [value + 1 for value in values2]
 
     pecan_samples = df_PECAN.columns[1:].tolist()
+    sample_colors = ['black' for _ in pecan_samples]
 
-    if subanalysis_do:
-        etp_indices = []
-        sample_colors = []
-        for i, sample in enumerate(pecan_samples):
-            # Check if the sample exists in the clinical data
-            match = clin_df[clin_df['RNAseq_id_D'] == sample]
-            if not match.empty:
-                stage = match[subanalysis_col].values[0]
-                if stage == subanalysis_hit:
-                    sample_colors.append('red')
-                    etp_indices.append(i)
+    if split_by_subtype:
+        match = clin_df[clin_df['RNAseq_id_D'].isin(pecan_samples)]
+        unique_subtypes = match['group'].dropna().unique()
+        sample_subtypes = {row['RNAseq_id_D']: row['group'] for _, row in match.iterrows()}
+        
+        for subtype in unique_subtypes:
+            indices = [i for i, sample in enumerate(pecan_samples) if sample_subtypes.get(sample) == subtype]
+            values1_sub = np.array(values1)[indices]
+            values2_sub = np.array(values2)[indices]
+            
+            if len(values1_sub) > 1:
+                fig, ax = plt.subplots(figsize=(8, 8), dpi=200)
+                
+                if log_scale:
+                    log_values1_sub = np.log10(values1_sub)
+                    log_values2_sub = np.log10(values2_sub)
+                    r_value, p_value = pearsonr(log_values1_sub, log_values2_sub)
+                    Xs = log_values1_sub.reshape(-1, 1)
+                    Ys = log_values2_sub
                 else:
-                    sample_colors.append('black')
-            else:
-                sample_colors.append('black')
-        values1_etp = np.array(values1)[etp_indices]
-        values2_etp = np.array(values2)[etp_indices]
-        if len(values1_etp) > 1:
-            if log_scale:
-                # Perform regression in log-transformed space
-                log_values1_etp = np.log10(values1_etp)
-                log_values2_etp = np.log10(values2_etp)
-                r_value_etp, p_value_etp = pearsonr(log_values1_etp, log_values2_etp)
-                Xs_etp = log_values1_etp.reshape(-1, 1)
-                Ys_etp = log_values2_etp
-                model_etp = LinearRegression()
-                model_etp.fit(Xs_etp, Ys_etp)
-                Y_pred_etp = model_etp.predict(Xs_etp)
-            else:
-                r_value_etp, p_value_etp = pearsonr(values1_etp, values2_etp)
-                Xs_etp = values1_etp.reshape(-1, 1)
-                Ys_etp = values2_etp
-                model_etp = LinearRegression()
-                model_etp.fit(Xs_etp, Ys_etp)
-                Y_pred_etp = model_etp.predict(Xs_etp)
-    else:
-        sample_colors = ['black' for sample in pecan_samples]
-
+                    r_value, p_value = pearsonr(values1_sub, values2_sub)
+                    Xs = values1_sub.reshape(-1, 1)
+                    Ys = values2_sub
+                
+                model = LinearRegression()
+                model.fit(Xs, Ys)
+                Y_pred = model.predict(Xs)
+                a, b = model.coef_[0], model.intercept_
+                
+                plt.plot(values1_sub, Y_pred, label='%s: R=%.2f, p=%f%s' % (subtype, r_value, p_value, (', y=%.2fx + %.2f' % (a, b) if show_equation else '')), color='black')
+                plt.scatter(values1_sub, values2_sub, color='black', alpha=0.3)
+                
+                if log_scale:
+                    plt.yscale('log')
+                    plt.xscale('log')
+                    plt.xlabel(gene1 + ' (FPKM+1)', fontsize=18)
+                    plt.ylabel(gene2 + ' (FPKM+1)', fontsize=18)
+                else:
+                    plt.xlabel(gene1 + ' (FPKM)', fontsize=18)
+                    plt.ylabel(gene2 + ' (FPKM)', fontsize=18)
+                plt.tick_params(axis='both', labelsize=16)
+                plt.title('PECAN expression: %s v %s (%s)' % (gene1, gene2, subtype), fontsize=22)
+                plt.legend(fontsize=16)
+                file_name = 'PECAN_correlation_%s_v_%s_%s.svg' % (gene1, gene2, subtype.replace('/','_'))
+                WriteFile(file_name)
+    
+    fig, ax = plt.subplots(figsize=(8, 8), dpi=200)
     if log_scale:
-        # Perform regression in log-transformed space
         log_values1 = np.log10(values1)
         log_values2 = np.log10(values2)
         r_value, p_value = pearsonr(log_values1, log_values2)
         Xs = log_values1.reshape(-1, 1)
         Ys = log_values2
-        model = LinearRegression()
-        model.fit(Xs, Ys)
-        Y_pred = model.predict(Xs)
-
-        # Back-transform Xs for plotting
-        sorted_indices = np.argsort(log_values1)
-        sorted_log_values1 = log_values1[sorted_indices]
-        sorted_Y_pred = Y_pred[sorted_indices]
-        sorted_original_values1 = 10**sorted_log_values1
-        sorted_Y_pred_back = 10**sorted_Y_pred
     else:
+        r_value, p_value = pearsonr(values1, values2)
         Xs = np.array(values1).reshape(-1, 1)
         Ys = np.array(values2)
-        r_value, p_value = pearsonr(values1, values2)
-        model = LinearRegression()
-        model.fit(Xs, Ys)
-        Y_pred = model.predict(Xs)
-        sorted_indices = np.argsort(values1)
-        sorted_original_values1 = np.array(values1)[sorted_indices]
-        sorted_Y_pred_back = Y_pred[sorted_indices]
-
-    ax, fig = plt.subplots(figsize=(8, 8), dpi=200)
-    plt.plot(sorted_original_values1, sorted_Y_pred_back, color='black', label='All: R=%.2f, p=%f' % (r_value, p_value))
-    if subanalysis_do:
-        if log_scale:
-            plt.plot(10**log_values1_etp, 10**Y_pred_etp, color='red', label='%s: R=%.2f, p=%f' % (subanalysis_hit, r_value_etp, p_value_etp))
-        else:
-            plt.plot(values1_etp, Y_pred_etp, color='red', label='%s: R=%.2f, p=%f' % (subanalysis_hit, r_value_etp, p_value_etp))
+    
+    model = LinearRegression()
+    model.fit(Xs, Ys)
+    Y_pred = model.predict(Xs)
+    a, b = model.coef_[0], model.intercept_
+    
+    plt.plot(values1, Y_pred, label='All: R=%.2f, p=%f%s' % (r_value, p_value, (', y=%.2fx + %.2f' % (a, b) if show_equation else '')), color='black')
     plt.scatter(values1, values2, color=sample_colors, alpha=0.3)
-    if log_scale:
-        plt.yscale('log')
-        plt.xscale('log')
-        plt.xlabel(gene1 + ' (FPKM+1)', fontsize=18)
-        plt.ylabel(gene2 + ' (FPKM+1)', fontsize=18)
-    else:
-        plt.xlabel(gene1 + ' (FPKM)', fontsize=18)
-        plt.ylabel(gene2 + ' (FPKM)', fontsize=18)
+    plt.xlabel(gene1 + ' (FPKM)', fontsize=18)
+    plt.ylabel(gene2 + ' (FPKM)', fontsize=18)
     plt.tick_params(axis='both', labelsize=16)
     plt.title('PECAN expression: %s v %s' % (gene1, gene2), fontsize=22)
     plt.legend(fontsize=16)
-    file_name = 'PECAN_correlation_%s_v_%s.png' % (gene1, gene2)
+    file_name = 'PECAN_correlation_%s_v_%s.svg' % (gene1, gene2)
     WriteFile(file_name)
 
 
@@ -261,10 +248,9 @@ def top_n_comparisons(gene, gene_set, label):
 #Use KTC_GetGene
 # name_gene_set = 'HALLMARK_MYC_TARGETS_V1'
 # name_gene_set = 'HALLMARK_ESTROGEN_RESPONSE_EARLY'
-label = 'WP_KETOGENESIS_AND_KETOLYSIS_custom'
+label = 'Neuroblastoma Breakpoint Family'
 #KTC_GetGeneSet can take: a list of gene names, a single gene name, or the name of a gene set from Msigdb
 gene_set = KTC_GetGeneSet(['CPT2','ACAT1','OXCT1','BDH1','SLC2A1','SLC16A1','UCP2','SLC25A20','HMGC2','HMGCL', 'OXCT1','CDK6'])
-
 
 #Targets is a list of gene names who will have correlations for all other genes calculated (top hits will be )
 targets = ['IGF2BP2']
@@ -284,8 +270,8 @@ for target in targets:
 #Overwrite 'target' and 'target2' abd run this cell
 #File is saved in out_dir/[target]
 #DHFR, NAMPT, IDO1, NAPRT1
-target  = 'IGF2BP2'
-target2 = 'SP1'
+target  = 'HNRNPC'
+target2 = 'COPS4'
 Grapher(target, target2)
 
 #%% ===========================================================================
@@ -297,8 +283,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from itertools import combinations
 from collections import defaultdict
+from scipy import stats
 
-def SubsetBoxplotter(gene, PECAN_col):
+def SubsetBoxplotter(gene, PECAN_col, perform_statistics=True, write_file=False, _palette='gray'):
     if gene not in df_PECAN['Gene'].values:
         print(f"Gene '{gene}' not found in df_PECAN.")
         return
@@ -324,13 +311,28 @@ def SubsetBoxplotter(gene, PECAN_col):
         for expression in expressions
     ])
 
+    data = data[~data['Subtype'].isin(['.', 'Unevaluable'])]
+
+
     if data.empty:
         print(f"No matching data found for gene {gene}.")
         return
 
+    # # Perform the Shapiro-Wilk test for normality on each group
+    # for subtype in data['Subtype'].unique():
+    #     group_data = data[data['Subtype'] == subtype]['Expression']
+    #     stat, p_value = stats.shapiro(group_data)
+
+    #     print(f"Shapiro-Wilk test for {subtype}:")
+    #     print(f"  Test statistic: {stat}, p-value: {p_value}")
+    #     if p_value > 0.05:
+    #         print(f"  The data for {subtype} is normally distributed.")
+    #     else:
+    #         print(f"  The data for {subtype} is NOT normally distributed.")
+
     # Plot the boxplot and stripplot
-    plt.figure(figsize=(10, 8), dpi=200)
-    sns.boxplot(data=data, x='Subtype', y='Expression', palette='gray', showfliers=False)
+    plt.figure(figsize=(8, 8), dpi=200)
+    sns.boxplot(data=data, x='Subtype', y='Expression', palette=_palette, showfliers=False)
     sns.stripplot(
         data=data,
         x='Subtype',
@@ -342,24 +344,24 @@ def SubsetBoxplotter(gene, PECAN_col):
         jitter=True
     )
 
-    # Specify the pairs to compare
-    pairs = list(combinations(data['Subtype'].unique(), 2))
-
-    # Create Annotator and calculate p-values using statannotations
-    annotator = Annotator(plt.gca(), pairs, data=data, x='Subtype', y='Expression')
-
-    annotator.configure(test='t-test_ind', text_format='star', loc='inside', verbose=2)
-    annotator.hide_non_significant = True
-    # Apply annotations for significant pairs
-    _, results = annotator.apply_and_annotate()
-
-    # Filter out insignificant pairs based on p-value threshold (e.g., p < 0.05)
-    significant_pairs = []
-    for idx, res in enumerate(results):
-        p_value = res.data.pvalue  # Extract p-value from the result
-        if p_value < 0.05:  # Only include significant p-values
-            significant_pairs.append(pairs[idx])  # Use the pair index to get the corresponding pair
-
+    if perform_statistics:
+        # Specify the pairs to compare
+        pairs = list(combinations(data['Subtype'].unique(), 2))
+    
+        # Create Annotator and calculate p-values using statannotations
+        annotator = Annotator(plt.gca(), pairs, data=data, x='Subtype', y='Expression')
+        annotator.configure(test='t-test_ind', text_format='star', loc='inside', verbose=2)
+        annotator.hide_non_significant = True
+    
+        # Apply annotations for significant pairs
+        _, results = annotator.apply_and_annotate()
+    
+        # Filter out insignificant pairs based on p-value threshold (e.g., p < 0.05)
+        significant_pairs = []
+        for idx, res in enumerate(results):
+            p_value = res.data.pvalue  # Extract p-value from the result
+            if p_value < 0.05:  # Only include significant p-values
+                significant_pairs.append(pairs[idx])  # Use the pair index to get the corresponding pair
 
     # Set the plot title and labels
     plt.title(f'PeCan expression of {gene} in patients grouped by column: \"{PECAN_col}\"', fontsize=14)
@@ -369,21 +371,23 @@ def SubsetBoxplotter(gene, PECAN_col):
     plt.yticks(fontsize=10)
 
     plt.tight_layout()
+    if write_file:
+        out_path = os.path.join(out_dir, '%s_%s.svg' %(gene, PECAN_col))
+        plt.savefig(out_path)
     plt.show()
 
-clin_cols = ['Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx']
 
-gene     = 'METTL3'
-clin_col = 'group'
-SubsetBoxplotter(gene, clin_col)
+# Example usage
+clin_col = 'ETP status' # Choose from: 'Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx, 'ETP status'
+gene     = 'KDM6B'
+SubsetBoxplotter(gene, clin_col, True, False, 'pastel')
+
+#ETP near, not
 
 
-
-
-
-#%% 6b Creating a plot for each meaningful clinical parameter
-gene = 'IGF2BP2'
+#%% 6c Creating a plot for all category for a set of genes:
+clin_cols = ['Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx', 'ETP status']
+genes     = ['METTL3', 'METTL14', 'FTO', 'HNRNPC', 'MYC', 'HMGCS1', 'FDFT1', 'DHCR7']
 for cc in clin_cols:
-    SubsetBoxplotter(gene, cc)
-
-#%%
+    for gene in genes:
+        SubsetBoxplotter(gene, cc, False, True)
