@@ -118,14 +118,8 @@ clin_df.rename(columns={'index': 'Patient_ID'}, inplace=True)
 
 out_dir   = '/Users/kasperthorhaugechristensen/Desktop/Dumpbox' # Directory where files and images are written. Subdirectories for individual genes are created
 
-
-#%%
-
-#df_gexp  = pd.read_csv(PECAN_in, sep='\t')
-#clin_df   = pd.read_csv(clin_data, sep='\t')
-top_n     = 2 # E.g. 10 will generate graphs for the 5 most positive and most negatively correlated genes
-
 #%% Optional
+top_n            = 10 # E.g. 10 will generate graphs for the 5 most positive and most negatively correlated genes
 print_corr_genes = False # Genes above and below breakpoints can be written directly to console
 write_files      = True # Turns on/off the writing of csv and pngs
 log_scale        = False
@@ -339,7 +333,7 @@ label = 'Neuroblastoma Breakpoint Family'
 gene_set = KTC_GetGeneSet(['CPT2','ACAT1','OXCT1','BDH1','SLC2A1','SLC16A1','UCP2','SLC25A20','HMGC2','HMGCL', 'OXCT1','CDK6'])
 
 #Targets is a list of gene names who will have correlations for all other genes calculated (top hits will be )
-targets = ['KDM6B']
+targets = ['HMGCS1']
 
 for target in targets:
     bottom_genes, top_genes = top_n_comparisons(target, gene_set, label)
@@ -356,8 +350,8 @@ for target in targets:
 #Overwrite 'target' and 'target2' abd run this cell
 #File is saved in out_dir/[target]
 #DHFR, NAMPT, IDO1, NAPRT1
-target  = 'KDM6B'
-target2 = 'TMEM88'
+target  = 'IGF2BP2'
+target2 = 'MSI2'
 split_by_subtype = False
 subanalysis_do = False
 show_equation = True
@@ -457,16 +451,17 @@ def SubsetBoxplotter(gene, PECAN_col, perform_statistics=True, write_file=False,
 # Example usage with custom order
 clin_col = 'ETP.STATUS' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
 # Choose from: 'Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx', 'ETP status'
-gene = 'CEBPZ'
+gene = 'KDM6B'
 colors = 'pastel'  # Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
-SubsetBoxplotter(gene, clin_col, perform_statistics=False, write_file=True, _palette=colors, _dotcolor='white', _fontsize=16, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
+SubsetBoxplotter(gene, clin_col, perform_statistics=True, write_file=True, _palette=colors, _dotcolor='white', _fontsize=16, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
 # SubsetBoxplotter(gene, clin_col, perform_statistics=False, write_file=True, _palette=colors, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
 
 # SubsetBoxplotter(gene,clin_col, perform_statistics=True, write_file=True,_palette=colors, order=None)
 
 #%% 6c Creating a plot for all category for a set of genes:
 clin_cols = ['Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx', 'ETP status']
-genes     = ['METTL3', 'METTL14', 'FTO', 'HNRNPC', 'MYC', 'HMGCS1', 'FDFT1', 'DHCR7']
+clin_cols = ['ETP.STATUS']
+genes     = ['KDM6B']
 for cc in clin_cols:
     for gene in genes:
         SubsetBoxplotter(gene, cc, False, True)
