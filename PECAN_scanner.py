@@ -42,25 +42,27 @@ from scipy.stats import pearsonr, mannwhitneyu
 from statannotations.Annotator import Annotator
 from sklearn.linear_model import LinearRegression
 
+files_directory = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/' #Directory where files for clinical and gene expression are stored
+out_dir   = '/Users/kasperthorhaugechristensen/Desktop/Dumpbox/Cristina' # Directory where files and images are written. Subdirectories for individual genes are created
 
 
 #Initialization
 #PECAN_in  = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/Expression_Pecan.txt' # PECAN FPKM data
 #clin_data = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PECAN_clinical_reference.tsv'
 print("Loading gene expression data...")
-df_gexp                  = pd.read_csv('/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_gexp.csv')
+df_gexp                  = pd.read_csv(os.path.join(files_directory, 'PeCan_gexp.csv'))
 print("Loading clinical data...")
-df_annot                 = pd.read_csv('/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_annot.csv')
-df_M0_clinical           = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M0_clinical.csv")
-df_M1_classifying_driver = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M1_classifying_driver.csv")
-df_M2_ETP_status         = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M2_ETP_status.csv")
-df_M3_genetic_subtype    = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M3_genetic_subtype.csv")
-df_M3_subsubtype         = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M3_subsubtype.csv")
-df_M3_subtype            = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M3_subtype.csv")
-df_M4_pathway            = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M4_pathway.csv")
-df_M5_allesions_genes    = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M5_Allesions_genes.csv")
-df_M5_allesions_variants = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M5_Allesions_variants.csv")
-df_M7_IP                 = pd.read_csv("/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PeCan_M7_IP.csv")
+df_annot                 = pd.read_csv(os.path.join(files_directory, 'PeCan_annot.csv'))
+df_M0_clinical           = pd.read_csv(os.path.join(files_directory, 'PeCan_M0_clinical.csv'))
+df_M1_classifying_driver = pd.read_csv(os.path.join(files_directory, "PeCan_M1_classifying_driver.csv"))
+df_M2_ETP_status         = pd.read_csv(os.path.join(files_directory, "PeCan_M2_ETP_status.csv"))
+df_M3_genetic_subtype    = pd.read_csv(os.path.join(files_directory, "PeCan_M3_genetic_subtype.csv"))
+df_M3_subsubtype         = pd.read_csv(os.path.join(files_directory, "PeCan_M3_subsubtype.csv"))
+df_M3_subtype            = pd.read_csv(os.path.join(files_directory, "PeCan_M3_subtype.csv"))
+df_M4_pathway            = pd.read_csv(os.path.join(files_directory, "PeCan_M4_pathway.csv"))
+df_M5_allesions_genes    = pd.read_csv(os.path.join(files_directory, "PeCan_M5_Allesions_genes.csv"))
+df_M5_allesions_variants = pd.read_csv(os.path.join(files_directory, "PeCan_M5_Allesions_variants.csv"))
+df_M7_IP                 = pd.read_csv(os.path.join(files_directory, "PeCan_M7_IP.csv"))
 
 print("Merging clinical data...")
 for df in [df_gexp, df_M1_classifying_driver, df_M2_ETP_status, df_M3_genetic_subtype, 
@@ -116,7 +118,6 @@ for i, df in enumerate(df_list[1:], start=1):
 clin_df.reset_index(inplace=True)
 clin_df.rename(columns={'index': 'Patient_ID'}, inplace=True)
 
-out_dir   = '/Users/kasperthorhaugechristensen/Desktop/Dumpbox' # Directory where files and images are written. Subdirectories for individual genes are created
 
 #%% Optional
 top_n            = 10 # E.g. 10 will generate graphs for the 5 most positive and most negatively correlated genes
@@ -160,11 +161,11 @@ def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanaly
                 if stage == subanalysis_hit:
                     sample_colors[i] = 'red'
                     etp_indices.append(i)
-    
+
     values1 = np.array(values1)
     values2 = np.array(values2)
     sample_colors = np.array(sample_colors)
-    
+
     if split_by_subtype:
         match = clin_df[clin_df['Patient_ID'].isin(pecan_samples)]  # Changed to Patient_ID
         unique_subtypes = match['Classifying Driver'].dropna().unique()
@@ -232,9 +233,6 @@ def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanaly
         plt.legend(fontsize=16)
         file_name = 'PECAN_correlation_%s_v_%s.svg' % (gene1, gene2)
         WriteFile(file_name)
-
-
-
 
 # This plot is called to create the waterfall plot and return genes above and below breakpoints (for csv output)
 def WaterfallPlot(dictionary, target_gene, gene_set, label):
@@ -350,11 +348,11 @@ for target in targets:
 #Overwrite 'target' and 'target2' abd run this cell
 #File is saved in out_dir/[target]
 #DHFR, NAMPT, IDO1, NAPRT1
-target  = 'IGF2BP2'
-target2 = 'MSI2'
+target  = 'KDM6B'
+target2 = 'CEBPZ'
 split_by_subtype = False
 subanalysis_do = False
-show_equation = True
+show_equation = False
 subanalysis_col = 'ETP.STATUS'
 subanalysis_hit = 'ETP'
 # Grapher(target, target2, split_by_subtype, subanalysis_do, subanalysis_col, subanalysis_hit,show_equation=False)
@@ -451,7 +449,7 @@ def SubsetBoxplotter(gene, PECAN_col, perform_statistics=True, write_file=False,
 # Example usage with custom order
 clin_col = 'ETP.STATUS' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
 # Choose from: 'Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx', 'ETP status'
-gene = 'KDM6B'
+gene = 'SP1'
 colors = 'pastel'  # Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
 SubsetBoxplotter(gene, clin_col, perform_statistics=True, write_file=True, _palette=colors, _dotcolor='white', _fontsize=16, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
 # SubsetBoxplotter(gene, clin_col, perform_statistics=False, write_file=True, _palette=colors, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
@@ -465,4 +463,55 @@ genes     = ['KDM6B']
 for cc in clin_cols:
     for gene in genes:
         SubsetBoxplotter(gene, cc, False, True)
+
+#%% Kaplan Meier of event-free survival
+import pandas as pd
+import matplotlib.pyplot as plt
+from lifelines import KaplanMeierFitter
+from lifelines.statistics import logrank_test
+
+# Define the gene of interest
+gene = "KDM6B"  # Change this to any gene from df_gexp
+
+# Ensure matching Patient_IDs
+matched_clin_df = clin_df[clin_df['Patient_ID'].isin(df_gexp.columns)]
+
+# Extract expression values for the selected gene
+gene_expression = df_gexp.set_index("Gene").loc[gene, matched_clin_df['Patient_ID']]
+
+# Compute the median expression
+median_expression = gene_expression.median()
+
+# Split into High and Low expression groups
+matched_clin_df["Expression_Group"] = ["High" if gene_expression[pid] > median_expression else "Low" for pid in matched_clin_df["Patient_ID"]]
+
+# Extract survival data
+time_high = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "High", "EFS"]
+event_high = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "High", "EFS.status"]
+time_low = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "Low", "EFS"]
+event_low = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "Low", "EFS.status"]
+
+# Initialize Kaplan-Meier fitters
+kmf_high = KaplanMeierFitter()
+kmf_low = KaplanMeierFitter()
+
+# Fit data for both groups
+kmf_high.fit(time_high, event_high, label="High Expression")
+kmf_low.fit(time_low, event_low, label="Low Expression")
+
+# Perform log-rank test
+logrank_p = logrank_test(time_high, time_low, event_high, event_low).p_value
+
+# Plot survival curves
+plt.figure(figsize=(8,6),dpi=200)
+plt.ylim(0)
+kmf_high.plot_survival_function()
+kmf_low.plot_survival_function()
+plt.title(f"Kaplan-Meier Survival by {gene} Expression (p value: %.4f)" %(logrank_p))
+plt.xlabel("Days (Event-free survival)")
+plt.ylabel("Survival Probability")
+plt.legend()
+plt.grid()
+WriteFile(os.path.join(out_dir, '%s_KaplanMeier.svg' %(gene)))
+plt.show()
 
