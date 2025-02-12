@@ -1,16 +1,14 @@
 # PECAN_scanner.py:
-The purpose of this script is to explore correlations between genes in the PECAN dataset.
-There are four applications of this script:
-	1. Replace 'target' in section 4 and run that cell
-		- This script will create a waterfall graph with genes ranked based on Pearson's R
-		- Breakpoints will be identified using the Kneedle algorithm
-		- All genes with their R- and p-values will be written to a csv together with their position relative to the breakpoints
-	2. Replace 'target' and 'target2' in section 5 and run that cell
-		- Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
-	3. Replace 'gene' and 'clin_col' in cell 6 and run that cell
-		Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
-	4. Replace 'gene' in section 7 and run that cell.
-		Script will generate a Kaplan-Meier graph for event-free survival for that gene
+The purpose of this script is to explore correlations between genes in the PECAN dataset. There are four applications of this script:
+1. Replace 'target' in section 4 and run that cell
+   - This script will create a waterfall graph with genes ranked based on Pearson's R
+   - Breakpoints will be identified using the Kneedle algorithm - All genes with their R- and p-values will be written to a csv together with their position relative to the breakpoints
+3. Replace 'target' and 'target2' in section 5 and run that cell
+   - Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
+5. Replace 'gene' and 'clin_col' in cell 6 and run that cell
+   - Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
+7. Replace 'gene' in section 7 and run that cell - Script will generate a Kaplan-Meier graph for event-free survival for that gene
+   - Script will generate a Kaplan-Meier graph for event-free survival for that gene
 
 Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written to compare levels of expression across different levels of invasion of the central nervous system of patients in the PeCan dataset. Also - some of the functionalities of this script may rely on KTC_functions.py which you can find on this GitHub.
 
