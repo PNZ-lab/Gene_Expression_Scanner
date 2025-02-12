@@ -5,7 +5,7 @@
 # 1. Description
 # =============================================================================
 '''
-This purpose of this script is to explore correlations between genes in the PECAN dataset.
+The purpose of this script is to explore correlations between genes in the PECAN dataset.
 There are four applications of this script:
 	1. Replace 'target' in section 4 and run that cell
 		- This script will create a waterfall graph with genes ranked based on Pearson's R
@@ -17,11 +17,6 @@ There are four applications of this script:
 		Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
 	4. Replace 'gene' in section 7 and run that cell.
 		Script will generate a Kaplan-Meier graph for event-free survival for that gene
-
-Optionally, the script can perform a separate coloring and calculation of an input column and hit using the PECAN_clinical_reference.tsv
-	- e.g. (Classifying Driver==TAL1) or (ETP.STATUS==ETP)
-	- Important: The calculation for the subset is in addition to the normal data - that is the black trendline and R includes the subset
-
 '''
 
 #%% ===========================================================================
