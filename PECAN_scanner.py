@@ -139,7 +139,7 @@ def WriteFile(name):
 		print('file created: %s' %(os.path.join(out_dir_target, name)))
 
 # This function is called elsewhere to create pairwise correlation plots between two genes
-def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanalysis_col=None, subanalysis_hit=None, show_equation=False):
+def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanalysis_col=None, subanalysis_hit=None, show_equation=False, set_lim_0=False):
     values1 = df_gexp.loc[df_gexp['Gene'] == gene1].iloc[0, 1:].tolist()
     values2 = df_gexp.loc[df_gexp['Gene'] == gene2].iloc[0, 1:].tolist()
     
@@ -191,6 +191,9 @@ def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanaly
                 plt.title('PECAN expression: %s v %s (%s)' % (gene1, gene2, subtype), fontsize=22)
                 plt.legend(fontsize=16)
                 file_name = 'PECAN_correlation_%s_v_%s_%s.svg' % (gene1, gene2, subtype.replace('/','_'))
+                if set_lim_0 == True:
+                    plt.ylim(0)
+                    plt.xlim(0)
                 WriteFile(file_name)
                 plt.show()
                 plt.close(fig)
@@ -232,7 +235,11 @@ def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanaly
         plt.title('PECAN expression: %s v %s' % (gene1, gene2), fontsize=22)
         plt.legend(fontsize=16)
         file_name = 'PECAN_correlation_%s_v_%s.svg' % (gene1, gene2)
+        if set_lim_0 == True:
+            plt.ylim(0)
+            plt.xlim(0)
         WriteFile(file_name)
+        plt.show()
 
 # This plot is called to create the waterfall plot and return genes above and below breakpoints (for csv output)
 def WaterfallPlot(dictionary, target_gene, gene_set, label):
@@ -319,7 +326,7 @@ def top_n_comparisons(gene, gene_set, label):
    return(sorted_genes[:round(top_n/2)], sorted_genes[-round(top_n/2):])
 
 #%% ===========================================================================
-# 4. Scan for best correlations for one gene
+# 4. Run this cell to scan for best correlations for one gene
 # =============================================================================
 
 # # Gene sets whose genes will be highlighted on the Waterfall Plot
@@ -343,26 +350,27 @@ for target in targets:
 
 
 #%% ===========================================================================
-# 5. Perform a single, specified comparison
+# 5. Run this cell to perform a single, specified comparison
 # =============================================================================
 #Overwrite 'target' and 'target2' abd run this cell
 #File is saved in out_dir/[target]
-#DHFR, NAMPT, IDO1, NAPRT1
-target  = 'KDM6B'
-target2 = 'CEBPZ'
-split_by_subtype = False
-subanalysis_do = False
+target  = 'KDM6B' # The expression of the gene on the 1st axis
+target2 = 'CEBPZ' # The expression of the gene on the 2nd axis
 show_equation = False
-subanalysis_col = 'ETP.STATUS'
-subanalysis_hit = 'ETP'
+split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
+set_lim_0 = True 
+subanalysis_do = False # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
+subanalysis_col = 'ETP.STATUS' # This column in the clinical data will be used to separate patients into two groups
+subanalysis_hit = 'ETP' # This value in the column above will be used to separate patients into two groups
+
 # Grapher(target, target2, split_by_subtype, subanalysis_do, subanalysis_col, subanalysis_hit,show_equation=False)
-Grapher(target, target2, split_by_subtype,subanalysis_do=subanalysis_do, subanalysis_col=subanalysis_col, subanalysis_hit=subanalysis_hit,  show_equation=show_equation)
+Grapher(target, target2, split_by_subtype,subanalysis_do=subanalysis_do, subanalysis_col=subanalysis_col, subanalysis_hit=subanalysis_hit,  show_equation=show_equation, set_lim_0=set_lim_0)
 
 #%% ===========================================================================
 # 6. Analyze levels of expression across clinical parameters
 # =============================================================================
 
-def SubsetBoxplotter(gene, PECAN_col, perform_statistics=True, write_file=False, _palette='gray', _dotcolor='white', _fontsize=14, order=None):
+def SubsetBoxplotter(gene, PECAN_col, do_stats=True, write_file=False, _palette='gray', _dotcolor='white', _fontsize=14, order=None, set_ylim_0=False):
     if gene not in df_gexp['Gene'].values:
         print(f"Gene '{gene}' not found in df_gexp.")
         return
@@ -421,7 +429,7 @@ def SubsetBoxplotter(gene, PECAN_col, perform_statistics=True, write_file=False,
         order=order
     )
 
-    if perform_statistics:
+    if do_stats:
         # Specify the pairs to compare
         pairs = list(combinations(data['Subtype'].unique(), 2))
 
@@ -439,7 +447,8 @@ def SubsetBoxplotter(gene, PECAN_col, perform_statistics=True, write_file=False,
     plt.ylabel('Expression (FPKM)', fontsize=_fontsize)
     plt.xticks(rotation=45, fontsize=_fontsize)
     plt.yticks(fontsize=_fontsize)
-
+    if set_ylim_0 == True:
+        plt.ylim(0)
     plt.tight_layout()
     if write_file:
         out_path = os.path.join(out_dir, f"{gene}_{PECAN_col}.svg")
@@ -447,14 +456,20 @@ def SubsetBoxplotter(gene, PECAN_col, perform_statistics=True, write_file=False,
     plt.show()
 
 # Example usage with custom order
-clin_col = 'ETP.STATUS' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
-# Choose from: 'Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx', 'ETP status'
-gene = 'SP1'
-colors = 'pastel'  # Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
-SubsetBoxplotter(gene, clin_col, perform_statistics=True, write_file=True, _palette=colors, _dotcolor='white', _fontsize=16, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
-# SubsetBoxplotter(gene, clin_col, perform_statistics=False, write_file=True, _palette=colors, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
+clin_col   = 'ETP.STATUS' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
+gene       = 'SP1' # The gene whose expression you want to track
+palette    = 'pastel'  # The colors used in the graph. Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
+dotcolor   = 'white' # The colors of the dots on top of the boxplots
+fontsize   = 16 # The size of the text items
+order      = ['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'] # Specify the order. Leave commented out or make sure the items are represented in the clin_col
+set_ylim_0 = True # Force the 2nd axis to include 0
+write_file = True # Write the graph to a file. Will be written to out_dir
+do_stats   = True # Perform a statistical analysis and include asterisks in the plot
 
-# SubsetBoxplotter(gene,clin_col, perform_statistics=True, write_file=True,_palette=colors, order=None)
+SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=16, order=order, set_ylim_0=set_ylim_0)
+# SubsetBoxplotter(gene, clin_col, do_stats=False, write_file=True, _palette=colors, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
+
+# SubsetBoxplotter(gene,clin_col, do_stats=True, write_file=True,_palette=colors, order=None)
 
 #%% 6c Creating a plot for all category for a set of genes:
 clin_cols = ['Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx', 'ETP status']
