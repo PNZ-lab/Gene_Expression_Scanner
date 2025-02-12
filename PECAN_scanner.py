@@ -6,7 +6,7 @@
 # =============================================================================
 '''
 This purpose of this script is to explore correlations between genes in the PECAN dataset.
-There are two applications of this script:
+There are four applications of this script:
 	1. Replace 'target' in section 4 and run that cell
 		- This script will create a waterfall graph with genes ranked based on Pearson's R
 		- Breakpoints will be identified using the Kneedle algorithm
@@ -15,9 +15,11 @@ There are two applications of this script:
 		- Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
 	3. Replace 'gene' and 'clin_col' in cell 6 and run that cell
 		Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
+	4. Replace 'gene' in section 7 and run that cell.
+		Script will generate a Kaplan-Meier graph for event-free survival for that gene
 
 Optionally, the script can perform a separate coloring and calculation of an input column and hit using the PECAN_clinical_reference.tsv
-	- e.g. (group==TAL1) or (ETP status==ETP)
+	- e.g. (Classifying Driver==TAL1) or (ETP.STATUS==ETP)
 	- Important: The calculation for the subset is in addition to the normal data - that is the black trendline and R includes the subset
 
 '''
@@ -43,12 +45,9 @@ from statannotations.Annotator import Annotator
 from sklearn.linear_model import LinearRegression
 
 files_directory = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/' #Directory where files for clinical and gene expression are stored
-out_dir   = '/Users/kasperthorhaugechristensen/Desktop/Dumpbox/Cristina' # Directory where files and images are written. Subdirectories for individual genes are created
-
+out_dir         = '/Users/kasperthorhaugechristensen/Desktop/Dumpbox/Cristina' # Directory where files and images are written. Subdirectories for individual genes are created
 
 #Initialization
-#PECAN_in  = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/Expression_Pecan.txt' # PECAN FPKM data
-#clin_data = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/PECAN_clinical_reference.tsv'
 print("Loading gene expression data...")
 df_gexp                  = pd.read_csv(os.path.join(files_directory, 'PeCan_gexp.csv'))
 print("Loading clinical data...")
@@ -126,7 +125,7 @@ write_files      = True # Turns on/off the writing of csv and pngs
 log_scale        = False
 show_breakpoint  = False # Identify and label breakpoints with Kneedle
 #%% ===========================================================================
-# 3. Functions
+# 3. Main functions: WriteFile: (), Grapher (expression correlation of two proteins),
 # =============================================================================
 
 def WriteFile(name):
@@ -358,7 +357,7 @@ target  = 'KDM6B' # The expression of the gene on the 1st axis
 target2 = 'CEBPZ' # The expression of the gene on the 2nd axis
 show_equation = False
 split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
-set_lim_0 = True 
+set_lim_0 = False 
 subanalysis_do = False # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
 subanalysis_col = 'ETP.STATUS' # This column in the clinical data will be used to separate patients into two groups
 subanalysis_hit = 'ETP' # This value in the column above will be used to separate patients into two groups
@@ -457,21 +456,22 @@ def SubsetBoxplotter(gene, PECAN_col, do_stats=True, write_file=False, _palette=
 
 # Example usage with custom order
 clin_col   = 'ETP.STATUS' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
-gene       = 'SP1' # The gene whose expression you want to track
+gene       = 'SPI1' # The gene whose expression you want to track
 palette    = 'pastel'  # The colors used in the graph. Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
 dotcolor   = 'white' # The colors of the dots on top of the boxplots
 fontsize   = 16 # The size of the text items
-order      = ['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'] # Specify the order. Leave commented out or make sure the items are represented in the clin_col
+order      = ['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'] # Specify the order. Set to None or make sure the items are represented in the clin_col
 set_ylim_0 = True # Force the 2nd axis to include 0
 write_file = True # Write the graph to a file. Will be written to out_dir
 do_stats   = True # Perform a statistical analysis and include asterisks in the plot
 
 SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=16, order=order, set_ylim_0=set_ylim_0)
+# SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=16, set_ylim_0=set_ylim_0)
 # SubsetBoxplotter(gene, clin_col, do_stats=False, write_file=True, _palette=colors, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
 
 # SubsetBoxplotter(gene,clin_col, do_stats=True, write_file=True,_palette=colors, order=None)
 
-#%% 6c Creating a plot for all category for a set of genes:
+#%% 6c Creating a plot for all categories for a set of genes:
 clin_cols = ['Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx', 'ETP status']
 clin_cols = ['ETP.STATUS']
 genes     = ['KDM6B']
@@ -479,54 +479,59 @@ for cc in clin_cols:
     for gene in genes:
         SubsetBoxplotter(gene, cc, False, True)
 
-#%% Kaplan Meier of event-free survival
+
+#%% ===========================================================================
+#  7. Run this to create a Kaplan Meier plot of event-free survival for one gene
+# =============================================================================
 import pandas as pd
-import matplotlib.pyplot as plt
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
 
+def KaplanMeier(_gene):
+    # Ensure matching Patient_IDs
+    matched_clin_df = clin_df[clin_df['Patient_ID'].isin(df_gexp.columns)]
+    
+    # Extract expression values for the selected gene
+    gene_expression = df_gexp.set_index("Gene").loc[_gene, matched_clin_df['Patient_ID']]
+    
+    # Compute the median expression
+    median_expression = gene_expression.median()
+    
+    # Split into High and Low expression groups
+    matched_clin_df["Expression_Group"] = ["High" if gene_expression[pid] > median_expression else "Low" for pid in matched_clin_df["Patient_ID"]]
+    
+    # Extract survival data
+    time_high = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "High", "EFS"]
+    event_high = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "High", "EFS.status"]
+    time_low = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "Low", "EFS"]
+    event_low = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "Low", "EFS.status"]
+    
+    # Initialize Kaplan-Meier fitters
+    kmf_high = KaplanMeierFitter()
+    kmf_low = KaplanMeierFitter()
+    
+    # Fit data for both groups
+    kmf_high.fit(time_high, event_high, label="High Expression")
+    kmf_low.fit(time_low, event_low, label="Low Expression")
+    
+    # Perform log-rank test
+    logrank_p = logrank_test(time_high, time_low, event_high, event_low).p_value
+    
+    # Plot survival curves
+    plt.figure(figsize=(6,5),dpi=200)
+    plt.ylim(0)
+    kmf_high.plot_survival_function()
+    kmf_low.plot_survival_function()
+    plt.title(f"Kaplan-Meier Survival by {_gene} Expression (p value: %.4f)" %(logrank_p))
+    plt.xlabel("Days (Event-free survival)")
+    plt.ylabel("Survival Probability")
+    plt.legend()
+    plt.grid()
+    WriteFile(os.path.join(out_dir, '%s_KaplanMeier.svg' %(_gene)))
+    plt.show()
+
+
 # Define the gene of interest
-gene = "KDM6B"  # Change this to any gene from df_gexp
-
-# Ensure matching Patient_IDs
-matched_clin_df = clin_df[clin_df['Patient_ID'].isin(df_gexp.columns)]
-
-# Extract expression values for the selected gene
-gene_expression = df_gexp.set_index("Gene").loc[gene, matched_clin_df['Patient_ID']]
-
-# Compute the median expression
-median_expression = gene_expression.median()
-
-# Split into High and Low expression groups
-matched_clin_df["Expression_Group"] = ["High" if gene_expression[pid] > median_expression else "Low" for pid in matched_clin_df["Patient_ID"]]
-
-# Extract survival data
-time_high = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "High", "EFS"]
-event_high = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "High", "EFS.status"]
-time_low = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "Low", "EFS"]
-event_low = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "Low", "EFS.status"]
-
-# Initialize Kaplan-Meier fitters
-kmf_high = KaplanMeierFitter()
-kmf_low = KaplanMeierFitter()
-
-# Fit data for both groups
-kmf_high.fit(time_high, event_high, label="High Expression")
-kmf_low.fit(time_low, event_low, label="Low Expression")
-
-# Perform log-rank test
-logrank_p = logrank_test(time_high, time_low, event_high, event_low).p_value
-
-# Plot survival curves
-plt.figure(figsize=(8,6),dpi=200)
-plt.ylim(0)
-kmf_high.plot_survival_function()
-kmf_low.plot_survival_function()
-plt.title(f"Kaplan-Meier Survival by {gene} Expression (p value: %.4f)" %(logrank_p))
-plt.xlabel("Days (Event-free survival)")
-plt.ylabel("Survival Probability")
-plt.legend()
-plt.grid()
-WriteFile(os.path.join(out_dir, '%s_KaplanMeier.svg' %(gene)))
-plt.show()
+gene = "IKZF1"  # Change this to any gene from df_gexp
+KaplanMeier(gene)
 
