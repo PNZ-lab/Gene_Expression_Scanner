@@ -489,7 +489,7 @@ SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _pale
 
 # SubsetBoxplotter('AKT1',clin_col, do_stats=True, write_file=True)
 
-#%% 6c Creating a plot for all categories for a set of genes:
+#%% 6b Creating a plot for all categories for a set of genes:
 clin_cols = ['Classifying Driver', 'ETP.STATUS', 'Sex', 'Race', 'CNS.Status', 'Insurance', 'Treatment.Arm', 'Subtype', 'Subsuptype', 'IP Status']
 # clin_cols = ['ETP.STATUS', ]
 genes     = ['AKT1', 'MTOR', 'USP7', 'EIF4E', 'WTAP', 'METTL13', 'FBXW7', 'PTEN', 'RICTOR', 'RPTOR']
@@ -687,7 +687,9 @@ def Grapher_MSpr1(protein1, protein2, df_msdataset, log_scale=False, show_equati
     plt.show()
 
 # Example usage:
-Grapher_MSpr1(protein1='EZH2', protein2='IGF2BP2', df_msdataset=df_cell_line_MS)
+protein_x = 'EZH2'
+protein_y = 'IGF2BP2'
+Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_MS)
 
 
 
