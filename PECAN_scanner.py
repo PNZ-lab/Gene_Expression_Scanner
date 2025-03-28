@@ -57,6 +57,8 @@ df_M4_pathway            = pd.read_csv(os.path.join(files_directory, "PeCan_M4_p
 df_M5_allesions_genes    = pd.read_csv(os.path.join(files_directory, "PeCan_M5_Allesions_genes.csv"))
 df_M5_allesions_variants = pd.read_csv(os.path.join(files_directory, "PeCan_M5_Allesions_variants.csv"))
 df_M7_IP                 = pd.read_csv(os.path.join(files_directory, "PeCan_M7_IP.csv"))
+print("Loading cell line MS data")
+df_cell_line_MS          = pd.read_excel(os.path.join(files_directory, 'MS_results_PRC-5607 2.xlsx'), sheet_name='S2 Quantified proteins')
 
 print("Merging clinical data...")
 for df in [df_gexp, df_M1_classifying_driver, df_M2_ETP_status, df_M3_genetic_subtype, 
@@ -64,6 +66,9 @@ for df in [df_gexp, df_M1_classifying_driver, df_M2_ETP_status, df_M3_genetic_su
            df_M5_allesions_variants, df_M7_IP]:
     if 'Unnamed: 0' in df.columns:
         df.rename(columns={'Unnamed: 0': 'Gene'}, inplace=True)
+
+
+
 
 def collapse_binary_columns(df, new_column_name):
     """ Collapses multiple binary indicator columns into a single categorical column. """
@@ -133,7 +138,7 @@ def WriteFile(name):
 		print('file created: %s' %(os.path.join(out_dir_target, name)))
 
 # This function is called elsewhere to create pairwise correlation plots between two genes
-def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanalysis_col=None, subanalysis_hit=None, show_equation=False, set_lim_0=False):
+def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanalysis_col=None, subanalysis_hit=None, show_equation=False, set_lim_0=False, pval_scientific=False):
     values1 = df_gexp.loc[df_gexp['Gene'] == gene1].iloc[0, 1:].tolist()
     values2 = df_gexp.loc[df_gexp['Gene'] == gene2].iloc[0, 1:].tolist()
     
@@ -199,11 +204,15 @@ def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanaly
             values1_etp = values1[etp_indices]
             values2_etp = values2[etp_indices]
             
+            r_etp, p_etp = pearsonr(values1_etp, values2_etp)
+            formatted_p_etp = '{:.2e}'.format(p_etp) if pval_scientific else f'{p_etp:.3f}'
+
+            
             model_etp = LinearRegression()
             model_etp.fit(values1_etp.reshape(-1, 1), values2_etp)
             Y_pred_etp = model_etp.predict(values1_etp.reshape(-1, 1))
             
-            plt.plot(values1_etp, Y_pred_etp, label='%s%s' % (subanalysis_hit, ', y=%.2fx + %.2f' % (model_etp.coef_[0], model_etp.intercept_) if show_equation else ''), color='red')
+            plt.plot(values1_etp, Y_pred_etp, label=f'{subanalysis_hit}: R={r_etp:.2f}, p={formatted_p_etp}' + (f', y={model_etp.coef_[0]:.2f}x + {model_etp.intercept_:.2f}' if show_equation else ''), color='red')
         
         if log_scale:
             log_values1 = np.log10(values1)
@@ -216,13 +225,15 @@ def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanaly
             Xs = values1.reshape(-1, 1)
             Ys = values2
         
+        formatted_p_value = '{:.2e}'.format(p_value) if pval_scientific else p_value
+
+        
         model = LinearRegression()
         model.fit(Xs, Ys)
         Y_pred = model.predict(Xs)
         a, b = model.coef_[0], model.intercept_
         
-        plt.plot(values1, Y_pred, label='All: R=%.2f, p=%f%s' % (r_value, p_value, (', y=%.2fx + %.2f' % (a, b) if show_equation else '')), color='black')
-        
+        plt.plot(values1, Y_pred, label='All: R=%.2f, p=%s%s' % (r_value, formatted_p_value, (', y=%.2fx + %.2f' % (a, b) if show_equation else '')), color='black')
         plt.xlabel(gene1 + ' (FPKM)', fontsize=18)
         plt.ylabel(gene2 + ' (FPKM)', fontsize=18)
         plt.tick_params(axis='both', labelsize=16)
@@ -348,17 +359,28 @@ for target in targets:
 # =============================================================================
 #Overwrite 'target' and 'target2' abd run this cell
 #File is saved in out_dir/[target]
-target  = 'KDM6B' # The expression of the gene on the 1st axis
-target2 = 'CEBPZ' # The expression of the gene on the 2nd axis
-show_equation = False
+target  = 'HNRNPC' # The expression of the gene on the 1st axis
+target2 = 'FDFT1' # The expression of the gene on the 2nd axis
+show_equation    = False
 split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
-set_lim_0 = False 
-subanalysis_do = False # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
-subanalysis_col = 'ETP.STATUS' # This column in the clinical data will be used to separate patients into two groups
-subanalysis_hit = 'ETP' # This value in the column above will be used to separate patients into two groups
+set_lim_0        = False
+subanalysis_do   = False # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
+subanalysis_col  = 'Classifying Driver' # This column in the clinical data will be used to separate patients into two groups
+subanalysis_hit  = 'SPI1' # This value in the column above will be used to separate patients into two groups
+pval_scientific  = True
 
 # Grapher(target, target2, split_by_subtype, subanalysis_do, subanalysis_col, subanalysis_hit,show_equation=False)
-Grapher(target, target2, split_by_subtype,subanalysis_do=subanalysis_do, subanalysis_col=subanalysis_col, subanalysis_hit=subanalysis_hit,  show_equation=show_equation, set_lim_0=set_lim_0)
+Grapher(target, target2, split_by_subtype,subanalysis_do=subanalysis_do, subanalysis_col=subanalysis_col, subanalysis_hit=subanalysis_hit,  show_equation=show_equation, set_lim_0=set_lim_0, pval_scientific=pval_scientific)
+
+#%% 5b. Run all permutations for a set.
+import itertools
+genes = ['MTOR', 'EIF']
+gene_combinations = set(itertools.combinations(genes, 2))
+for target, target2 in gene_combinations:
+    Grapher(target, target2, split_by_subtype, subanalysis_do=subanalysis_do, 
+            subanalysis_col=subanalysis_col, subanalysis_hit=subanalysis_hit, 
+            show_equation=show_equation, set_lim_0=set_lim_0)
+
 
 #%% ===========================================================================
 # 6. Analyze levels of expression across clinical parameters
@@ -446,6 +468,7 @@ def SubsetBoxplotter(gene, PECAN_col, do_stats=True, write_file=False, _palette=
     plt.tight_layout()
     if write_file:
         out_path = os.path.join(out_dir, f"{gene}_{PECAN_col}.svg")
+        print(out_path)
         plt.savefig(out_path)
     plt.show()
 
@@ -455,24 +478,24 @@ gene       = 'SPI1' # The gene whose expression you want to track
 palette    = 'pastel'  # The colors used in the graph. Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
 dotcolor   = 'white' # The colors of the dots on top of the boxplots
 fontsize   = 16 # The size of the text items
-order      = ['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'] # Specify the order. Set to None or make sure the items are represented in the clin_col
-set_ylim_0 = True # Force the 2nd axis to include 0
+order      = ['ETP', 'Near-ETP', 'Non-ETP'] # Specify the order. Set to None or make sure the items are represented in the clin_col
+set_ylim_0 = False # Force the 2nd axis to include 0
 write_file = True # Write the graph to a file. Will be written to out_dir
-do_stats   = True # Perform a statistical analysis and include asterisks in the plot
+do_stats   = False # Perform a statistical analysis and include asterisks in the plot
 
+# SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=16, order=order, set_ylim_0=set_ylim_0)
 SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=16, order=order, set_ylim_0=set_ylim_0)
-# SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=16, set_ylim_0=set_ylim_0)
 # SubsetBoxplotter(gene, clin_col, do_stats=False, write_file=True, _palette=colors, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'])
 
-# SubsetBoxplotter(gene,clin_col, do_stats=True, write_file=True,_palette=colors, order=None)
+# SubsetBoxplotter('AKT1',clin_col, do_stats=True, write_file=True)
 
 #%% 6c Creating a plot for all categories for a set of genes:
-clin_cols = ['Maturation stage', 'group', 'Gender', 'Race', 'CNS_at_Dx', 'ETP status']
-clin_cols = ['ETP.STATUS']
-genes     = ['KDM6B']
+clin_cols = ['Classifying Driver', 'ETP.STATUS', 'Sex', 'Race', 'CNS.Status', 'Insurance', 'Treatment.Arm', 'Subtype', 'Subsuptype', 'IP Status']
+# clin_cols = ['ETP.STATUS', ]
+genes     = ['AKT1', 'MTOR', 'USP7', 'EIF4E', 'WTAP', 'METTL13', 'FBXW7', 'PTEN', 'RICTOR', 'RPTOR']
 for cc in clin_cols:
     for gene in genes:
-        SubsetBoxplotter(gene, cc, False, True)
+        SubsetBoxplotter(gene, cc,True,True)
 
 
 #%% ===========================================================================
@@ -527,6 +550,144 @@ def KaplanMeier(_gene):
 
 
 # Define the gene of interest
-gene = "IKZF1"  # Change this to any gene from df_gexp
+gene = "HNRNPC"  # Change this to any gene from df_gexp
 KaplanMeier(gene)
+
+#%% ===========================================================================
+# 8. Plotting levels in cell lines based on MS
+# =============================================================================
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from scipy.stats import pearsonr
+
+def Grapher_MSpr1(protein1, protein2, df_msdataset, log_scale=False, show_equation=False, pval_scientific=False):
+    # List of conditions (cell lines or experiments)
+    conditions = ['ALLSIL', 'DND41', 'HPBALL', 'LOUCY', 'TALL1', 'KARPAS45']
+    
+    # Initialize a dictionary to store the color map for each condition
+    colors = {'ALLSIL': 'red', 'DND41': 'blue', 'HPBALL': 'green', 'LOUCY': 'orange', 'TALL1': 'purple', 'KARPAS45': 'brown'}
+    
+    # Prepare lists to hold the data points for plotting
+    values1 = []
+    values2 = []
+    color_values = []
+
+    def find_matching_genes(gene_name, df):
+        """Search for rows containing the gene_name as a substring in the 'Gene names' column."""
+        # Exact match check
+        matching_rows = df[df['Gene names'].str.contains(f"^{gene_name}$", case=False, na=False)]
+        
+        if not matching_rows.empty:
+            return matching_rows  # Return exact matches if found
+        
+        # Find potential alternative matches that contain the gene_name string
+        alternative_matches = df[df['Gene names'].str.contains(gene_name, case=False, na=False)]
+        
+        if alternative_matches.empty:
+            print(f"No alternative matches found for '{gene_name}' either.")
+        else:
+            print(f"Suggested alternative gene names based on string matching:")
+            for index, row in alternative_matches.iterrows():
+                print(f"- {row['Gene names']}")  # Print all alternative gene names
+
+        return alternative_matches  # Return the found alternative matches if any
+
+
+    # Ensure proteins exist in the dataset, if not, find similar gene names
+    protein1_matches = find_matching_genes(protein1, df_msdataset)
+    protein2_matches = find_matching_genes(protein2, df_msdataset)
+
+    # Track if any gene was matched through substring search
+    substring_match_protein1 = not protein1_matches.empty and protein1 != protein1_matches['Gene names'].iloc[0]
+    substring_match_protein2 = not protein2_matches.empty and protein2 != protein2_matches['Gene names'].iloc[0]
+
+    if protein1_matches.empty:
+        print(f"Warning: No exact match found for {protein1}.")
+        return
+    if protein2_matches.empty:
+        print(f"Warning: No exact match found for {protein2}.")
+        return
+
+    
+
+    # Inform user about substring matches
+    if substring_match_protein1:
+        print(f"Note: Substring match used for {protein1} in gene names.")
+    if substring_match_protein2:
+        print(f"Note: Substring match used for {protein2} in gene names.")
+    
+    # Get actual gene names for use in the title and axis labels
+    actual_protein1 = protein1_matches['Gene names'].iloc[0] if not protein1_matches.empty else protein1
+    actual_protein2 = protein2_matches['Gene names'].iloc[0] if not protein2_matches.empty else protein2
+
+    # Loop through conditions
+    for condition in conditions:
+        # Loop through replicate numbers rep1, rep2, rep3
+        for replicate in ['rep1', 'rep2', 'rep3']:
+            # Extracting the values for each replicate and condition
+            condition_values1 = protein1_matches.loc[
+                protein1_matches['Gene names'].str.contains(protein1, case=False),
+                f'log2_Reporter intensity corrected {condition}_{replicate}'
+            ].values.flatten()
+            
+            condition_values2 = protein2_matches.loc[
+                protein2_matches['Gene names'].str.contains(protein2, case=False),
+                f'log2_Reporter intensity corrected {condition}_{replicate}'
+            ].values.flatten()
+
+            # Append all replicate values to the lists
+            values1.extend(condition_values1)
+            values2.extend(condition_values2)
+            color_values.extend([colors[condition]] * len(condition_values1))  # Assign color based on condition
+
+    # Remove any NaN values from values1 and values2
+    mask = ~np.isnan(values1) & ~np.isnan(values2)
+    values1 = np.array(values1)[mask]
+    values2 = np.array(values2)[mask]
+    color_values = np.array(color_values)[mask]
+
+    # Scatter plot with different colors for different cell lines
+    fig, ax = plt.subplots(figsize=(8, 8), dpi=200)
+    for condition, color in colors.items():
+        condition_mask = color_values == color
+        plt.scatter(values1[condition_mask], values2[condition_mask], color=color, label=condition, alpha=0.5, zorder=6)
+
+    # Linear regression model
+    model = LinearRegression()
+    model.fit(values1.reshape(-1, 1), values2)
+    Y_pred = model.predict(values1.reshape(-1, 1))
+    
+    # Calculate Pearson's correlation coefficient and p-value
+    r_value, p_value = pearsonr(values1, values2)
+    formatted_p_value = '{:.2e}'.format(p_value) if pval_scientific else f'{p_value:.3f}'
+    
+    # Add regression line to the plot with the label
+    plt.plot(values1, Y_pred, color='black', label=f'R: {r_value:.2f}, p={formatted_p_value}')
+
+    # Set plot labels and title using actual gene names
+    plt.xlabel(f'{actual_protein1} (log2 intensity)', fontsize=18)
+    plt.ylabel(f'{actual_protein2} (log2 intensity)', fontsize=18)
+    plt.tick_params(axis='both', labelsize=16)
+
+    # Display the legend
+    plt.title(f'MS Data Correlation: {actual_protein1} vs {actual_protein2}', fontsize=22)
+
+    plt.legend(fontsize=16)
+
+    # Annotate if substring matches were used
+    if substring_match_protein1:
+        plt.text(0.1, 0.8, f'Note: Substring match used for {protein1}', transform=plt.gca().transAxes, fontsize=14, color='red', bbox=dict(facecolor='white', alpha=0.7))
+    if substring_match_protein2:
+        plt.text(0.1, 0.75, f'Note: Substring match used for {protein2}', transform=plt.gca().transAxes, fontsize=14, color='red', bbox=dict(facecolor='white', alpha=0.7))
+
+    # Save the figure as a .svg file
+    plt.savefig(f'MS_Correlation_{actual_protein1}_vs_{actual_protein2}.svg')
+    plt.show()
+
+# Example usage:
+Grapher_MSpr1(protein1='EZH2', protein2='IGF2BP2', df_msdataset=df_cell_line_MS)
+
+
 
