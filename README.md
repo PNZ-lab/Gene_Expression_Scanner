@@ -89,8 +89,7 @@ KaplanMeier(gene)
 
 ## Kaplan-Meier plots of all clinical parameters (Section 8):
 e.g.
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/bdacfe5f-fc9b-4191-98aa-3c1205eaa45b">
-
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/2e6fdf5a-64d1-47fb-937b-062c20a192e9">
 
 ## Correlation plot of protein levels in six cell lines (Section 9):
 
