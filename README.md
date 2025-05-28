@@ -87,7 +87,11 @@ KaplanMeier(gene)
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/7a87e812-5be0-4191-8c4f-8ddee8b61b0a">
 
-## Correlation plot of protein levels in six cell lines (Section 8):
+## Kaplan-Meier plots of all clinical parameters (Section 8):
+e.g.
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/2e6fdf5a-64d1-47fb-937b-062c20a192e9">
+
+## Correlation plot of protein levels in six cell lines (Section 9):
 
 ```
 protein_x = "EZH2"
