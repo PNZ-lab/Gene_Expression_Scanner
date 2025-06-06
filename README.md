@@ -83,12 +83,36 @@ top_n_residuals  = 0
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/c0e7a459-fa7a-4360-ac35-5ef5de930904">
 
 
-## Graph produced for a single comparison using subanalysis_do=True:
-Here:
+## subanalysis_do=True only shows includes data points for a subset of patients that satisfy criteria in the clinical dataframe:
+
 ```python
 subanalysis_do=True
 subanalysis_col='ETP status'
 subanalysis_hit='ETP'
+```
+
+Available options for subanlysis_col and subanalysis_hit:
+```
+Classifying Driver
+   MLLT10, TLX3, LYL1, HOXA13, HOXA9, BCL11B, ZFP36L2, KMT2A, Unknown, LMO1, NKX2-5, NUP98, NUP214, MYB, ETV6, SPI1, TLX1, TAL2, NKX2-1, MED12, TAL1, LMO2
+ETP.STATUS
+   Near-ETP, Unknown, ETP, Non-ETP
+Sex
+   Female, Male
+Race
+   Native Hawaiian or other Pacific Islander, Reported Unknown, Black or African American, Asian, American Indian or Alaska Native, White
+CNS.Status
+   CNS 3c, CNS 3, CNS 3a, CNS 2b, CNS 2a, CNS 2c, CNS 3b, Unknown, CNS 2, CNS 1
+Insurance
+   PRIVATE INSURANCE, UNKNOWN, MEDICAID, MILITARY SPONSORED (INCLUDING CHAMPUS & TRICARE), MEDICARE, nan, NO MEANS OF PAYMENT (NO INSURANCE), SELF PAY (NO INSURANCE), OTHER, MEDICAID AND MEDICARE, MEDICARE AND PRIVATE INSURANCE
+Treatment.Arm
+   Arm C, Arm B, nan, Arm D, Standard Induction, Arm A
+Subtype
+   MLLT10, TLX3, STAG2&LMO2, KMT2A, NKX2-1, HOXA9 TCR, TME-enriched, NUP98, SPI1, NKX2-5, TAL1 DP-like, NUP214, TAL1 αβ-like, TLX1, LMO2 γδ-like, ETP-like, BCL11B
+Subsubtype
+   TLX3 DP-like, TLX3 Immature, HOXA9 ETP-like, TAL1 DP-like&RPL10, NKX2-1 Other, NKX2-1 TCR, Unknown, HOXA13 ETP-like, Other ETP-like
+IP Status
+   IP_LR_ETP-like, IP_LR_Myeloid-like, IP_LR_DP-like, Unknown, IP_LR_αβ-like
 ```
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/02d20bd9-f1f3-405b-af4b-19a53773a81c">
