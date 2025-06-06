@@ -93,7 +93,7 @@ subanalysis_hit='ETP'
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/02d20bd9-f1f3-405b-af4b-19a53773a81c">
 
 
-Available options for subanlysis_col and subanalysis_hit:
+Available options for subanalysis_col and subanalysis_hit:
 ```
 Classifying Driver
    MLLT10, TLX3, LYL1, HOXA13, HOXA9, BCL11B, ZFP36L2, KMT2A, Unknown, LMO1, NKX2-5, NUP98, NUP214, MYB, ETV6, SPI1, TLX1, TAL2, NKX2-1, MED12, TAL1, LMO2
