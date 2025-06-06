@@ -83,7 +83,7 @@ top_n_residuals  = 0
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/c0e7a459-fa7a-4360-ac35-5ef5de930904">
 
 
-## subanalysis_do=True only shows includes data points for a subset of patients that satisfy criteria in the clinical dataframe:
+## subanalysis_do=True only includes data points for a subset of patients that satisfy criteria in the clinical dataframe:
 
 ```python
 subanalysis_do=True
@@ -119,14 +119,46 @@ IP Status
 
 ## Expression levels with patients split based on a clinical parameter (Section 6):
 
-### Basic boxplot with gene expression split by ETP status
+### Basic boxplot with gene expression split by ETP status, order variable should be set to None or a predefined order to appear in graph
 ```
-gene     = 'DHFR'
-clin_col = 'ETP status'
-SubsetBoxplotter(gene, clin_col)
+clin_col   = 'ETP.STATUS'
+gene       = 'KDM6B'
+palette    = 'pastel'
+dotcolor   = 'white'
+fontsize   = 16
+order      = ['ETP', 'Near-ETP', 'Non-ETP']
+set_ylim_0 = False
+write_file = False
+do_stats   = False
+list_n     = False
+sort_mean  = False
+do_binary  = False
+hit_binary = 'Near-ETP'
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/9c77e48e-1b53-468f-9cd6-a367b6c34db9">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/4c209ad5-5832-4f28-9c04-892821e857c0">
+
+
+### set_ylim_0=True forces 0 to be included on the y-axis, do_stats=True performs a t-test and shows asterisks, list_n=True shows the number of samples, sort_mean=True orders the groups by their means, do_binary=True isolates all samples with hit_binary in clin_col and compares them to the rest
+
+```
+clin_col   = 'ETP.STATUS'
+gene       = 'KDM6B'
+palette    = 'pastel'
+dotcolor   = 'white'
+fontsize   = 16
+order      = None
+set_ylim_0 = True
+write_file = False
+do_stats   = True
+list_n     = True
+sort_mean  = True
+do_binary  = True
+hit_binary = 'Near-ETP'
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/2d54fae0-c250-45bf-b73c-c731efc06c74">
+
 
 ### perform_statistics and write_file toggle showing significance and saving the plot, _palette changes color scheme, order specificies the order of the boxplots
 
