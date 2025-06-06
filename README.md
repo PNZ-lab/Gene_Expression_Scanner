@@ -29,22 +29,53 @@ Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written
 
 ```python
 target  = 'HNRNPC'
-target2 = 'COPS4'
-Grapher(target, target2)
+target2 = 'COPS4' 
+show_equation    = False
+split_by_subtype = False
+set_lim_0        = False
+subanalysis_do   = False
+subanalysis_col  = 'Subtype'
+subanalysis_hit  = 'ETP-like'
+pval_scientific  = True
+top_n_residuals  = 0
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/eec534b5-cbfa-4c65-90f0-6dc93f1323e1">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/ccd18204-55b8-4cc4-b245-cded156ad4e5">
 
-### split_by_subtypes==True produces plots per subtype, show_equation==True displays slope and intersect
+### top_n_residuals>0 indicates the patients which lie the closest to the regression line and prints them in the terminal
+
+```python
+target  = 'HNRNPC' # The expression of the gene on the 1st axis
+target2 = 'COPS4' # The expression of the gene on the 2nd axis
+show_equation    = False
+split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
+set_lim_0        = False
+subanalysis_do   = False # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
+subanalysis_col  = 'Subtype' # This column in the clinical data will be used to separate patients into two groups
+subanalysis_hit  = 'ETP-like' # This value in the column above will be used to separate patients into two groups
+pval_scientific  = True
+top_n_residuals  = 100
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/c53123a6-a5dc-45ad-b2b2-dadc7412fb4e">
+
+
+### split_by_subtypes=True produces plots per subtype, show_equation=True displays slope and intersect, set_lim_0=True forces origo inclusion
 
 ```python
 target  = 'HNRNPC'
-target2 = 'MYC'
-Grapher(target, target2, split_by_subtype=True, show_equation=True)
+target2 = 'COPS4'
+show_equation    = True
+split_by_subtype = True
+set_lim_0        = True
+subanalysis_do   = True
+subanalysis_col  = 'Subtype'
+subanalysis_hit  = 'ETP-like'
+pval_scientific  = True
+top_n_residuals  = 0
 ```
 
-
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/7ebd4cee-fc17-4941-886c-41cf66b2aa00">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/c0e7a459-fa7a-4360-ac35-5ef5de930904">
 
 
 ## Graph produced for a single comparison using subanalysis_do=True:
