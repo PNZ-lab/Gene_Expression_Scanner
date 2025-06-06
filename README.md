@@ -90,6 +90,8 @@ subanalysis_do=True
 subanalysis_col='ETP status'
 subanalysis_hit='ETP'
 ```
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/02d20bd9-f1f3-405b-af4b-19a53773a81c">
+
 
 Available options for subanlysis_col and subanalysis_hit:
 ```
@@ -114,8 +116,6 @@ Subsubtype
 IP Status
    IP_LR_ETP-like, IP_LR_Myeloid-like, IP_LR_DP-like, Unknown, IP_LR_αβ-like
 ```
-
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/02d20bd9-f1f3-405b-af4b-19a53773a81c">
 
 ## Expression levels with patients split based on a clinical parameter (Section 6):
 
