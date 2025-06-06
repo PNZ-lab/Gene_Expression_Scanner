@@ -25,7 +25,7 @@ Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written
 ## Graphs produced for a single comparison (Section 5):
 - R and p-values are calculated using Pearson's R.
 
-### Basic comparison of two genes for all patients
+#### Basic comparison of two genes for all patients
 
 ```python
 target  = 'HNRNPC'
@@ -42,7 +42,7 @@ top_n_residuals  = 0
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/ccd18204-55b8-4cc4-b245-cded156ad4e5">
 
-### top_n_residuals>0 indicates the patients which lie the closest to the regression line and prints them in the terminal
+#### top_n_residuals>0 indicates the patients which lie the closest to the regression line and prints them in the terminal
 
 ```python
 target  = 'HNRNPC'
@@ -65,7 +65,7 @@ Residual range: 0.0003 to 0.0255
 Sample IDs: PAVSHE, PAVXPT, PAUGLY, PARLIB, PATZYE, PAVXBD, PAVHVN, PAURFC, PAVKZV, PARUCV, PASMHF, PARMJA, PASJIY, PATXNK, PAVESV, PARIHY, PAWLPU, PAWAWJ, PAWAYT, PASVJM, PAVKWV, PAUGAA, PAWEEX, PAUXKE, PAUKWJ, PAUFZC, PATSDS, PAUXZN, PAWIXS, PASPJR, PASXUL, PAUEIL, PASKLK, PAVGSF, PATKZH, PASRAF, PATRAB, PASWNU, PAUYIK, PAVFWF, PAUAIZ, PAUDPH, PAVMGW, PATGVX, PAWCWY, PAWBMY, PAUCIB, PASILW, PAWKKF, PAUSEY, PATEFF, PAVPEN, PARJFH, PAUEYF, PATWHB, PAVFIC, PASZTU, PAWGLE, PATEBX, PATGZA, PAWCWL, PAUIFR, PAUMLV, PATBYK, PAVLMX, PAVCRK, PARFLD, PATDRC, PAWLSM, PARFWJ, PATYYJ, PAVYTZ, PAUXAI, PAWFBT, PAVVHL, PATZWM, PAWIBU, PAVCEA, PATKRF, PATTTE, PASKIC, PASYCN, PATIHV, PAVMPB, PAUHDN, PAWGDG, PAWGIT, PAUIRF, PATIFI, PATKVR, PASYKJ, PATGLV, PAVRHT, PARXTW, PAUCDC, PAWAIN, PAVFBV, PAWIGC, PAUHAF, PAWALP
 ```
 
-### split_by_subtypes=True produces plots per subtype, show_equation=True displays slope and intersect, set_lim_0=True forces origo inclusion
+#### split_by_subtypes=True produces plots per subtype, show_equation=True displays slope and intersect, set_lim_0=True forces origo inclusion
 
 ```python
 target  = 'HNRNPC'
@@ -83,7 +83,7 @@ top_n_residuals  = 0
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/c0e7a459-fa7a-4360-ac35-5ef5de930904">
 
 
-## subanalysis_do=True only includes data points for a subset of patients that satisfy criteria in the clinical dataframe:
+## subanalysis_do=True separates data points for a subset of patients that satisfy criteria in the clinical dataframe:
 
 ```python
 subanalysis_do=True
@@ -119,7 +119,7 @@ IP Status
 
 ## Expression levels with patients split based on a clinical parameter (Section 6):
 
-### Basic boxplot with gene expression split by ETP status, order variable should be set to None or a predefined order to appear in graph
+#### Basic boxplot with gene expression split by ETP status, order variable should be set to None or a predefined order to appear in graph
 ```
 clin_col   = 'ETP.STATUS'
 gene       = 'KDM6B'
@@ -139,12 +139,12 @@ hit_binary = 'Near-ETP'
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/4c209ad5-5832-4f28-9c04-892821e857c0">
 
 
-### set_ylim_0=True forces 0 to be included on the y-axis, do_stats=True performs a t-test and shows asterisks, list_n=True shows the number of samples, sort_mean=True orders the groups by their means, do_binary=True isolates all samples with hit_binary in clin_col and compares them to the rest
+#### palette variable changes color scheme, set_ylim_0=True forces 0 to be included on the y-axis, do_stats=True performs a t-test and shows asterisks, list_n=True shows the number of samples, sort_mean=True orders the groups by their means, do_binary=True isolates all samples with hit_binary in clin_col and compares them to the rest
 
 ```
 clin_col   = 'ETP.STATUS'
 gene       = 'KDM6B'
-palette    = 'pastel'
+palette    = 'Set2'
 dotcolor   = 'white'
 fontsize   = 16
 order      = None
@@ -157,10 +157,10 @@ do_binary  = True
 hit_binary = 'Near-ETP'
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/2d54fae0-c250-45bf-b73c-c731efc06c74">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/2cbf4806-ec97-4175-94d5-070549ba876e">
 
 
-### perform_statistics and write_file toggle showing significance and saving the plot, _palette changes color scheme, order specificies the order of the boxplots
+#### perform_statistics and write_file toggle showing significance and saving the plot, _palette changes color scheme, order specificies the order of the boxplots
 
 ```
 gene     = 'METTL3'
