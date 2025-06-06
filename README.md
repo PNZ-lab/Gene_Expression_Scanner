@@ -160,16 +160,6 @@ hit_binary = 'Near-ETP'
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/2cbf4806-ec97-4175-94d5-070549ba876e">
 
 
-#### perform_statistics and write_file toggle showing significance and saving the plot, _palette changes color scheme, order specificies the order of the boxplots
-
-```
-gene     = 'METTL3'
-clin_col = 'group'
-SubsetBoxplotter(gene, clin_col, perform_statistics=False, write_file=False, _palette='pastel', order=['ETP', 'nearETP', 'notETP'])
-```
-
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/3f1c704b-4935-4675-8176-2bb70f4e9b3a">
-
 ## Kaplan-Meier plots of event-free survival based on gene expression levels (Section 7):
 
 ```
