@@ -45,14 +45,14 @@ top_n_residuals  = 0
 ### top_n_residuals>0 indicates the patients which lie the closest to the regression line and prints them in the terminal
 
 ```python
-target  = 'HNRNPC' # The expression of the gene on the 1st axis
-target2 = 'COPS4' # The expression of the gene on the 2nd axis
+target  = 'HNRNPC'
+target2 = 'COPS4'
 show_equation    = False
-split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
+split_by_subtype = False
 set_lim_0        = False
-subanalysis_do   = False # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
-subanalysis_col  = 'Subtype' # This column in the clinical data will be used to separate patients into two groups
-subanalysis_hit  = 'ETP-like' # This value in the column above will be used to separate patients into two groups
+subanalysis_do   = False
+subanalysis_col  = 'Subtype'
+subanalysis_hit  = 'ETP-like'
 pval_scientific  = True
 top_n_residuals  = 100
 ```
