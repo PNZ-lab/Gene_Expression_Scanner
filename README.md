@@ -1,5 +1,5 @@
-# PECAN_scanner.py:
-The purpose of this script is to explore correlations between genes in the PECAN dataset (and six cell lines). There are five applications of this script:
+# Gene_Expression_Scanner.py:
+The purpose of this script is to explore correlations between genes in the Polonen and CCLE dataset (and our own proteomics on six cell lines). There are several applications of this script:
 1. Replace 'target' in section 4 and run that cell
    - This script will create a waterfall graph with genes ranked based on Pearson's R
    - Breakpoints will be identified using the Kneedle algorithm - All genes with their R- and p-values will be written to a csv together with their position relative to the breakpoints
@@ -14,7 +14,21 @@ The purpose of this script is to explore correlations between genes in the PECAN
 
 Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written to compare levels of expression across different levels of invasion of the central nervous system of patients in the PeCan dataset. Also - some of the functionalities of this script may rely on KTC_functions.py which you can find on this GitHub.
 
-## Graph produced with Section 4 (with accompanying .csv):
+## Section 1 - Description
+This is for the human reading the script itself to parse the ambition and use behind it.
+
+## Section 2 - Setup and Settings
+This section reads and formats all the necessary data. The directory that contains all the necessary files are at:
+```
+cmgg_pnlab/Kasper/Data/Interesting_Lists
+```
+But in_dir (and potentially the out_dir where files are written to) will need to be modified to match the relative path to that directory for the user launching the script.
+Running Section 2 (and Section 3) is mandatory. The analyses will not run without the data loaded into memory (Section 2) - or the functions to analyze the data (Section 3).
+
+## Section 3 - Main Functions
+This section contains all the functions for every type of analysis performed by this script. Do not worry, while running this cell is mandatory, no analysis is performed until the functions are called in the sections below. As such running this cell just loads the functions into memory - and is thus instantaneous.
+
+## Section 4 - Graph produced with Section 4
 - Input one gene and scan all other genes for correlations (Pearson's R) between their expression levels to the target gene. <br>
 - Statistic and p-value calculated using Mannwhitney U test.
 
@@ -22,7 +36,7 @@ Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written
 <br>
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/c2f8dde5-1570-4936-a130-4129f171e2da">
 
-## Graphs produced for a single comparison (Section 5):
+## Section 5 - Graphs produced for a single gene-to-gene comparison
 - R and p-values are calculated using Pearson's R.
 
 #### Basic comparison of two genes for all patients
@@ -83,7 +97,7 @@ top_n_residuals  = 0
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/c0e7a459-fa7a-4360-ac35-5ef5de930904">
 
 
-## subanalysis_do=True separates data points for a subset of patients that satisfy criteria in the clinical dataframe:
+#### subanalysis_do=True separates data points for a subset of patients that satisfy criteria in the clinical dataframe:
 
 ```python
 subanalysis_do=True
@@ -117,7 +131,7 @@ IP Status
    IP_LR_ETP-like, IP_LR_Myeloid-like, IP_LR_DP-like, Unknown, IP_LR_αβ-like
 ```
 
-## Expression levels with patients split based on a clinical parameter (Section 6):
+## Section 6 - Expression levels with patients split based on a clinical parameter
 
 #### Basic boxplot with gene expression split by ETP status, order variable should be set to None or a predefined order to appear in graph
 ```
@@ -160,7 +174,7 @@ hit_binary = 'Near-ETP'
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/2cbf4806-ec97-4175-94d5-070549ba876e">
 
 
-## Kaplan-Meier plots of event-free survival based on gene expression levels (Section 7):
+## Section 7 - Kaplan-Meier plots of event-free survival based on gene expression levels
 
 ```
 gene = "IKZF1"
@@ -169,11 +183,11 @@ KaplanMeier(gene)
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/7a87e812-5be0-4191-8c4f-8ddee8b61b0a">
 
-## Kaplan-Meier plots of all clinical parameters (Section 8):
+## Section 8 - Kaplan-Meier plots of all clinical parameters
 e.g.
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/2e6fdf5a-64d1-47fb-937b-062c20a192e9">
 
-## Correlation plot of protein levels in six cell lines (Section 9):
+## Section 9 - Correlation plot of protein levels in six cell lines
 
 ```
 protein_x = "EZH2"
@@ -182,6 +196,42 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 ```
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/27774327-2e35-463a-bbb2-db82d8d0a644">
+
+
+## Section 10 - Correlation plot of gene-to-gene expression levels in CCLE data (cancer cell lines)
+
+```
+gene1         = 'RECQL4',
+gene2         = 'TONSL',
+show_equation = False,
+log_scale     = False,
+set_lim_0     = False,
+filter_col    = 'Hist_Subtype1',
+filter_val    = 'acute_lymphoblastic_T_cell_leukaemia'
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/6168d3a8-d762-4f68-9f68-02b21416d246">
+
+
+
+
+## Section 11 - Expression levels of a gene split by clinical parameters
+
+```
+CCLE_Boxplotter(
+    gene       = 'ZFX',
+    group_by   = 'Gender',
+    log_scale  = False,
+    fig_height = 5,
+    fig_width  = 5,
+    palette    = 'gray',
+    do_stats   = True
+    )
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/466aab4b-c665-48e5-8bdb-3c02306b5ce1">
+
+
 
 
 
