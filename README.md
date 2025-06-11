@@ -24,6 +24,12 @@ This section contains all the functions for every type of analysis performed by 
 - Input one gene and scan all other genes for correlations (Pearson's R) between their expression levels to the target gene. <br>
 - Statistic and p-value calculated using Mannwhitney U test.
 
+```python
+gene_set = KTC_GetGeneSet('splicing_factors')
+label = ', '.join(KTC_GetGeneSet('splicing_factors'))
+targets = ['TONSL']
+```
+
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/7e027f59-77fb-42e4-96fd-a19409ab2db7">
 <br>
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/c2f8dde5-1570-4936-a130-4129f171e2da">
