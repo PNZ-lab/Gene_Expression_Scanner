@@ -818,7 +818,7 @@ gene_set = KTC_GetGeneSet('Freya')
 label = ', '.join(KTC_GetGeneSet('Freya'))
 
 # Every gene in the list below ('targets') will have all gene-gene correlations to it calculated and plotted.
-targets = ['FTO']
+targets = ['TONSL']
 
 top_n            = 10 # E.g. 10 will generate graphs for the 5 most positive and most negatively correlated genes
 for target in targets:
@@ -835,8 +835,8 @@ for target in targets:
 # =============================================================================
 #Overwrite 'target' and 'target2' and run this cell
 #File is saved in out_dir/[target]
-target  = 'CDKN2A' # The expression of the gene on the 1st axis
-target2 = 'TYMS' # The expression of the gene on the 2nd axis
+target  = 'TONSL' # The expression of the gene on the 1st axis
+target2 = 'NFKB1' # The expression of the gene on the 2nd axis
 show_equation    = False
 split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
 set_lim_0        = False
@@ -926,8 +926,8 @@ for col in clin_cols:
 # 9. Our own cell line MS data - Compare gene expression level trends
 # =============================================================================
 
-protein_x = 'IGF2BP2'
-protein_y = 'EZH2'
+protein_x = 'TONSL'
+protein_y = 'NFKB1'
 Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_MS)
 
 
@@ -936,13 +936,13 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 # =============================================================================
 
 Grapher_CCLR(
-    gene1         = 'HIF1A',
-    gene2         = 'FTO',
+    gene1         = 'TONSL',
+    gene2         = 'MYC',
     show_equation = False,
     log_scale     = False,
     set_lim_0     = False,
     filter_col    = 'Hist_Subtype1',
-    filter_val    = 'plasma_cell_myeloma'
+    filter_val    = 'acute_lymphoblastic_T_cell_leukaemia'
     )
 
 
