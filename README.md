@@ -17,7 +17,7 @@ The purpose of this script is to explore correlations between genes in the Polon
 9. Replace 'gene' and 'group_by' in section 11 and run that cell
    -  Script will create a series of boxplots for the expression levels for cancer cell lines in CCLE separated by unique values in a column in the annotation dataset
 
-Sidenote: On this github you can find PECAN_CNS_Scanner.py, specifically written to compare levels of expression across different levels of invasion of the central nervous system of patients in the PeCan dataset. Also - some of the functionalities of this script may rely on KTC_functions.py which you can find on this GitHub.
+Sidenote: Some of the functionalities of this script can rely on KTC_functions.py to define a set of genes. This script supports you simply defining them by yourself, but if you want this functionality (e.g. Querying MSigDB for gene sets) - you can find KTC_functions.py on this GitHub.
 
 ## Section 1 - Description
 This is for the human reading the script itself to parse the ambition and use behind it.
