@@ -123,7 +123,7 @@ write_files      = True # Turns on/off the writing of csv and pngs
 log_scale        = False
 show_breakpoint  = False # Identify and label breakpoints with Kneedle
 #%% ===========================================================================
-# 3. Main functions: WriteFile, Grapher (expression correlation of two proteins), WaterfallPlot (every gene-gene correlation for one gene), SubsetBoxplotter
+# 3. Main functions
 # =============================================================================
 
 def WriteFile(name):
@@ -784,7 +784,7 @@ def CCLE_Boxplotter(
                            .index.tolist()
 
     # --- Step 5: Plot ---
-    plt.figure(figsize=(fig_height, fig_width), dpi=300)
+    plt.figure(figsize=(fig_width, fig_height), dpi=300)
     ax = sns.boxplot(
         x=group_by,
         y='Expression',
@@ -936,8 +936,8 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 # =============================================================================
 
 Grapher_CCLR(
-    gene1         = 'TONSL',
-    gene2         = 'MYC',
+    gene1         = 'RECQL4',
+    gene2         = 'TONSL',
     show_equation = False,
     log_scale     = False,
     set_lim_0     = False,
@@ -959,13 +959,13 @@ for col in filter_columns:
 # =============================================================================
 
 CCLE_Boxplotter(
-    gene       = 'JARID2',
-    group_by   = 'Histology',
+    gene       = 'ZFX',
+    group_by   = 'Gender',
     log_scale  = False,
-    fig_height = 15,
+    fig_height = 5,
     fig_width  = 5,
     palette    = 'gray',
-    do_stats   = False
+    do_stats   = True
     )
 
 print("\n[Filter Options]")
