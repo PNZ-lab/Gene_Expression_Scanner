@@ -1,21 +1,8 @@
 # Gene_Expression_Scanner.py:
-The purpose of this script is to explore correlations between genes in the Polonen and CCLE dataset (and our own proteomics on six cell lines). There are several applications of this script:
-1. Replace 'target' in section 4 and run that cell
-   - This script will create a waterfall graph with genes ranked based on Pearson's R
-   - Breakpoints will be identified using the Kneedle algorithm - All genes with their R- and p-values will be written to a csv together with their position relative to the breakpoints
-3. Replace 'target' and 'target2' in section 5 and run that cell
-   - Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
-4. Replace 'gene' and 'clin_col' in cell 6 and run that cell
-   - Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
-5. Replace 'gene' in section 7 and run that cell
-   - Script will generate a Kaplan-Meier graph for event-free survival for that gene
-6. Run section 8 to create a Kaplan-Meier graph for each clinical parameter
-7. Replace 'protein_x' and 'protein_y' in section 9 and run that cell
-   - Script will create a graph and calculate Pearson's R and associated p-value for the two specified proteins across triplicates in six cell lines
-8. Replace 'gene1' and 'gene2' in section 10 and run that cell
-   - Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes using cancer cell line data from CCLE
-9. Replace 'gene' and 'group_by' in section 11 and run that cell
-   -  Script will create a series of boxplots for the expression levels for cancer cell lines in CCLE separated by unique values in a column in the annotation dataset
+The purpose of this script is to explore correlations between genes in the Polonen 2024 and CCLE datasets (and our own proteomics on six cell lines). There are several applications of this script:
+1. Searching the Polonen 2024 dataset for gene-to-gene correlations and contrast gene expression to clinical parameters.
+2. Searching the CCLE cell line dataset for gene-to-gene correlations and contrast gene expression to clinical parameters.
+3. Searching our own cell line proteomics for gene-to-gene correlations.
 
 Sidenote: Some of the functionalities of this script can rely on KTC_functions.py to define a set of genes. This script supports you simply defining them by yourself, but if you want this functionality (e.g. Querying MSigDB for gene sets) - you can find KTC_functions.py on this GitHub.
 
