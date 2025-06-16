@@ -5,18 +5,27 @@
 # 1. Description
 # =============================================================================
 '''
-The purpose of this script is to explore correlations between genes in the PECAN dataset.
-There are four applications of this script:
-	1. Replace 'target' in section 4 and run that cell
-		- This script will create a waterfall graph with genes ranked based on Pearson's R
-		- Breakpoints will be identified using the Kneedle algorithm
-		- All genes with their R- and p-values will be written to a csv together with their position relative to the breakpoints
-	2. Replace 'target' and 'target2' in section 5 and run that cell
-		- Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
-	3. Replace 'gene' and 'clin_col' in cell 6 and run that cell
-		Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
-	4. Replace 'gene' in section 7 and run that cell.
-		Script will generate a Kaplan-Meier graph for event-free survival for that gene
+The purpose of this script is to explore correlations between genes in different datasets.
+There are several applications of this script:
+
+1. Replace 'target' in section 4 and run that cell
+   - This script will create a waterfall graph with genes ranked based on Pearson's R
+   - Breakpoints will be identified using the Kneedle algorithm - All genes with their R- and p-values will be written to a csv together with their position relative to the breakpoints
+3. Replace 'target' and 'target2' in section 5 and run that cell
+   - Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes
+4. Replace 'gene' and 'clin_col' in cell 6 and run that cell
+   - Script will create a series of boxplots for the expression levels for patients separated by unique values in a column in the clinical dataset
+5. Replace 'gene' in section 7 and run that cell
+   - Script will generate a Kaplan-Meier graph for event-free survival for that gene
+6. Run section 8 to create a Kaplan-Meier graph for each clinical parameter
+7. Replace 'protein_x' and 'protein_y' in section 9 and run that cell
+   - Script will create a graph and calculate Pearson's R and associated p-value for the two specified proteins across triplicates in six cell lines
+8. Replace 'gene1' and 'gene2' in section 10 and run that cell
+   - Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes using cancer cell line data from CCLE
+9. Replace 'gene' and 'group_by' in section 11 and run that cell
+   -  Script will create a series of boxplots for the expression levels for cancer cell lines in CCLE separated by unique values in a column in the annotation dataset
+
+Sidenote: Some of the functionalities of this script can rely on KTC_functions.py to define a set of genes. This script supports you simply defining them by yourself, but if you want this functionality (e.g. Querying MSigDB for gene sets) - you can find KTC_functions.py on this GitHub.
 '''
 
 #%% ===========================================================================
@@ -39,7 +48,7 @@ from scipy.stats import pearsonr, mannwhitneyu
 from statannotations.Annotator import Annotator
 from sklearn.linear_model import LinearRegression
 
-files_directory = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists' #Directory where files for clinical and gene expression are stored
+files_directory = '/Volumes/kachrist/shares/cmgg_pnlab/Kasper/Data/Interesting_Lists' #Directory where files for clinical and gene expression are stored
 out_dir         = '/Users/kasperthorhaugechristensen/Desktop/Dumpbox/Cristina' # Directory where files and images are written. Subdirectories for individual genes are created
 
 #Initialization
@@ -60,8 +69,8 @@ df_M7_IP                 = pd.read_csv(os.path.join(files_directory, "PeCan_M7_I
 print("Loading cell line MS data...")
 df_cell_line_MS          = pd.read_excel(os.path.join(files_directory, 'MS_results_PRC-5607 2.xlsx'), sheet_name='S2 Quantified proteins')
 print("Loading CCLE data...")
-path_CCLE_rpkm = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/CCLE_RNAseq_genes_rpkm_20180929.gct'
-path_CCLE_cl   = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists/Cell_lines_annotations_20181226.txt'
+path_CCLE_rpkm = os.path.join(files_directory, 'CCLE_RNAseq_genes_rpkm_20180929.gct')
+path_CCLE_cl   = os.path.join(files_directory, 'Cell_lines_annotations_20181226.txt')
 df_CCLE_rpkm   = pd.read_csv(path_CCLE_rpkm, sep='\t', skiprows=2)
 df_CCLE_cl     = pd.read_csv(path_CCLE_cl, sep='\t')
 
@@ -349,7 +358,7 @@ def top_n_comparisons(gene, gene_set, label):
 
 def SubsetBoxplotter(gene, PECAN_col, do_stats=True, write_file=False, _palette='gray',
                      _dotcolor='white', _fontsize=14, order=None, set_ylim_0=False,
-                     list_n=False, sort_mean=False, do_binary=False, hit_binary=None):
+                     list_n=False, sort_median=False, do_binary=False, hit_binary=None):
 
     if gene not in df_gexp['Gene'].values:
         print(f"Gene '{gene}' not found in df_gexp.")
@@ -413,9 +422,11 @@ def SubsetBoxplotter(gene, PECAN_col, do_stats=True, write_file=False, _palette=
         data = data.dropna(subset=['Expression', 'Subtype'])
         data['Subtype'] = data['Subtype'].astype(str)
 
-        if sort_mean:
-            mean_order = data.groupby('Subtype')['Expression'].mean().sort_values(ascending=False).index.tolist()
-            order = mean_order
+        if sort_median:
+            print('Sorting by median...')
+            median_order = data.groupby('Subtype')['Expression'].median().sort_values(ascending=False).index.tolist()
+            order = median_order
+            print(median_order)
         elif order:
             data['Subtype'] = pd.Categorical(data['Subtype'], categories=order, ordered=True)
 
@@ -425,8 +436,8 @@ def SubsetBoxplotter(gene, PECAN_col, do_stats=True, write_file=False, _palette=
         else:
             data['Subtype_Labeled'] = data['Subtype']
 
-        label_order = data.groupby('Subtype_Labeled')['Expression'].mean().sort_values(ascending=False).index.tolist() \
-            if sort_mean else (
+        label_order = data.groupby('Subtype_Labeled')['Expression'].median().sort_values(ascending=False).index.tolist() \
+            if sort_median else (
             [f"{cat}\n(n={sample_counts.get(cat, 0)})" if list_n else cat for cat in order] if order else data['Subtype_Labeled'].unique())
 
     # ========== #
@@ -814,8 +825,8 @@ def CCLE_Boxplotter(
 # =============================================================================
 
 # # Gene sets whose genes will be highlighted on the Waterfall Plot
-gene_set = KTC_GetGeneSet('Freya')
-label = ', '.join(KTC_GetGeneSet('Freya'))
+gene_set = KTC_GetGeneSet('splicing_factors')
+label = ', '.join(KTC_GetGeneSet('splicing_factors'))
 
 # Every gene in the list below ('targets') will have all gene-gene correlations to it calculated and plotted.
 targets = ['TONSL']
@@ -835,8 +846,8 @@ for target in targets:
 # =============================================================================
 #Overwrite 'target' and 'target2' and run this cell
 #File is saved in out_dir/[target]
-target  = 'TONSL' # The expression of the gene on the 1st axis
-target2 = 'NFKB1' # The expression of the gene on the 2nd axis
+target  = 'HIF1A' # The expression of the gene on the 1st axis
+target2 = 'FTO' # The expression of the gene on the 2nd axis
 show_equation    = False
 split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
 set_lim_0        = False
@@ -865,21 +876,21 @@ for target, target2 in gene_combinations:
 
 
 clin_col   = 'Classifying Driver' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
-gene       = 'BRD9' # The gene whose expression you want to track
+gene       = 'SOX11' # The gene whose expression you want to track
 palette    = 'gray'  # The colors used in the graph. Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
 dotcolor   = 'white' # The colors of the dots on top of the boxplots
 fontsize   = 16 # The size of the text items
-order      = ['ETP', 'Near-ETP', 'Non-ETP'] # Specify the order. Set to None or make sure the items are represented in the clin_col
+#order      = ['ETP', 'Near-ETP', 'Non-ETP'] # Specify the order. Set to None or make sure the items are represented in the clin_col
 order      = None
 set_ylim_0 = True # Force the 2nd axis to include 0
-write_file = False # Write the graph to a file. Will be written to out_dir
+write_file = True # Write the graph to a file. Will be written to out_dir
 do_stats   = False # Perform a statistical analysis and include asterisks in the plot
 list_n     = False # provide the number in each category
-sort_mean  = True
+sort_median= True
 do_binary  = False
 hit_binary = 'Near-ETP'
 
-SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=fontsize, set_ylim_0=set_ylim_0, list_n=list_n, sort_mean=sort_mean, do_binary=do_binary, hit_binary=hit_binary, order=order)
+SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=fontsize, set_ylim_0=set_ylim_0, list_n=list_n, sort_median=sort_median, do_binary=do_binary, hit_binary=hit_binary, order=order)
 # SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=16, order=order, set_ylim_0=set_ylim_0)
 # SubsetBoxplotter(gene, clin_col, do_stats=False, write_file=True, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'], list_n=list_n)
 
@@ -936,15 +947,14 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 # =============================================================================
 
 Grapher_CCLR(
-    gene1         = 'RECQL4',
-    gene2         = 'TONSL',
+    gene1         = 'HIF1A',
+    gene2         = 'FTO',
     show_equation = False,
     log_scale     = False,
     set_lim_0     = False,
     filter_col    = 'Hist_Subtype1',
     filter_val    = 'acute_lymphoblastic_T_cell_leukaemia'
     )
-
 
 print("\n[Filter Options]")
 filter_columns = ['Site_Primary','Histology', 'Hist_Subtype1', 'Hist_Subtype2', 'Gender', 'Life_Stage', 'Race']
