@@ -217,11 +217,13 @@ gene2         = 'TONSL',
 show_equation = False,
 log_scale     = False,
 set_lim_0     = False,
+label_points  = True,
 filter_col    = 'Hist_Subtype1',
 filter_val    = 'acute_lymphoblastic_T_cell_leukaemia'
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/6168d3a8-d762-4f68-9f68-02b21416d246">
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/1b3b8052-a46b-47f0-8abd-3d57d4c0a7e1">
 
 
 
