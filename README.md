@@ -171,6 +171,19 @@ hit_binary = 'Near-ETP'
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/2cbf4806-ec97-4175-94d5-070549ba876e">
 
+#### mut_show highlights patients with a specific gene mutation
+
+```
+mut_show   = True
+mut_gene   = 'MYCN'
+mut_aa     = 'P44L'
+mut_col    = 'red'
+mut_mark   = "."
+mut_mark_s = 150
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/d4b35620-de0a-434d-945e-72e8cd47da54">
+
 
 ## Section 7 - Kaplan-Meier plots of event-free survival based on gene expression levels
 
