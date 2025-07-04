@@ -50,7 +50,7 @@ from scipy.stats import pearsonr, mannwhitneyu
 from statannotations.Annotator import Annotator
 from sklearn.linear_model import LinearRegression
 
-files_directory = '/Volumes/kachrist/shares/cmgg_pnlab/Kasper/Data/Interesting_Lists' #Directory where files for clinical and gene expression are stored
+files_directory = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists' #Directory where files for clinical and gene expression are stored
 out_dir         = '/Users/kachrist/Desktop/out_dir' # Directory where files and images are written. Subdirectories for individual genes are created
 
 #Initialization
@@ -365,8 +365,8 @@ def SubsetBoxplotter(
     gene, PECAN_col, do_stats=True, write_file=False, _palette='gray',
     _dotcolor='white', _fontsize=14, order=None, set_ylim_0=False,
     list_n=False, sort_median=False, do_binary=False, hit_binary=None,
-    highlight_mutation=False, mutation_gene=None, mutation_aa_change=None,
-    mutation_marker='s', mutation_color='red', _mutation_marker_size=30
+    mut_show=False, mut_gene=None, mut_aa=None,
+    mut_mark='s', mut_col='red', mut_mark_s=30, stat_test='Mann-Whitney'
 ):
     if gene not in df_gexp['Gene'].values:
         print(f"Gene '{gene}' not found in df_gexp.")
@@ -430,8 +430,11 @@ def SubsetBoxplotter(
         data = data.dropna(subset=['Expression', 'Subtype'])
 
         if sort_median:
-            median_order = data.groupby('Subtype')['Expression'].median().sort_values(ascending=False).index.tolist()
-            order = median_order
+            # Compute both median and mean
+            group_stats = data.groupby('Subtype')['Expression'].agg(['median', 'mean'])
+            group_stats = group_stats.sort_values(by=['median', 'mean'], ascending=[False, False])
+            print(group_stats)
+            order = group_stats.index.tolist()
         elif order:
             data['Subtype'] = pd.Categorical(data['Subtype'], categories=order, ordered=True)
 
@@ -447,11 +450,10 @@ def SubsetBoxplotter(
 
     # ======== Mutation Lookup ========
     mutated_patients = set()
-    if highlight_mutation and mutation_gene and mutation_aa_change:
-        print('Mutation analysis')
-        mutation_string = f"p.{mutation_aa_change}"
-        mut_df = df_wgs[(df_wgs['gene'] == mutation_gene) & (df_wgs['aa_change'] == mutation_string)]
-        mutated_patients = set(mut_df['sample'])
+    if mut_show and mut_gene and mut_aa:
+            print(f'Mutation analysis: gene={mut_gene}, aa_change={mut_aa}')
+            mut_df = df_wgs[(df_wgs['gene'] == mut_gene) & (df_wgs['aa_change'] == mut_aa)]
+            mutated_patients = set(mut_df['sample'])
 
     # ========== Plotting ==========
     plt.figure(figsize=(6, 6), dpi=200)
@@ -462,17 +464,19 @@ def SubsetBoxplotter(
                   x='Subtype_Labeled', y='Expression', facecolor=_dotcolor,
                   edgecolor='black', linewidth=0.8, alpha=0.2, jitter=True, order=label_order)
 
-    if highlight_mutation:
+    if mut_show:
         mut_data = data[data['Patient_ID'].isin(mutated_patients)]
         if not mut_data.empty:
             sns.scatterplot(data=mut_data, x='Subtype_Labeled', y='Expression',
-                            marker=mutation_marker, s=_mutation_marker_size, color=mutation_color,
-                            edgecolor='black', linewidth=1, zorder=10)
+                            marker=mut_mark, s=mut_mark_s, color=mut_col,
+                            edgecolor='black', linewidth=0.8, zorder=10, label=f'{mut_gene} - {mut_aa}')
+        plt.legend()
 
     if do_stats and data['Subtype'].nunique() >= 2:
         pairs = list(combinations(data['Subtype'].dropna().unique(), 2))
         annotator = Annotator(ax, pairs, data=data, x='Subtype', y='Expression')
-        annotator.configure(test='t-test_ind', text_format='star', loc='inside', verbose=2)
+        annotator.configure(test=stat_test, text_format='star', loc='inside', verbose=1)
+        # annotator.configure(test='t-test_ind', text_format='star', loc='inside', verbose=0)
         annotator.hide_non_significant = True
         annotator.apply_and_annotate()
 
@@ -486,7 +490,12 @@ def SubsetBoxplotter(
     plt.tight_layout()
 
     if write_file:
-        out_path = os.path.join(out_dir, f"{gene}_{PECAN_col}_{_palette}.svg")
+        out_path = os.path.join(out_dir, f"{gene}_{PECAN_col}_{_palette}")
+        if mut_show:
+            out_path = out_path + f'_{mut_gene}_{mut_aa}'
+        if do_binary:
+            out_path = out_path + f'_{hit_binary}'
+        out_path = out_path + '.svg'
         print(f"Saved to: {out_path}")
         plt.savefig(out_path)
 
@@ -906,35 +915,32 @@ for target, target2 in gene_combinations:
 # 6. Analyze levels of expression across clinical parameters
 # =============================================================================
 
-
-clin_col   = 'Classifying Driver' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
+clin_col   = 'Subtype' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
 gene       = 'SOX11' # The gene whose expression you want to track
 palette    = 'gray'  # The colors used in the graph. Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
 dotcolor   = 'white' # The colors of the dots on top of the boxplots
 fontsize   = 12 # The size of the text items
 #order      = ['ETP', 'Near-ETP', 'Non-ETP'] # Specify the order. Set to None or make sure the items are represented in the clin_col
 order      = None
-set_ylim_0 = True # Force the 2nd axis to include 0
+set_ylim_0 = False # Force the 2nd axis to include 0
 write_file = True # Write the graph to a file. Will be written to out_dir
-do_stats   = False # Perform a statistical analysis and include asterisks in the plot
-list_n     = False # provide the number in each category
+list_n     = True # provide the number in each category
 sort_median= True
-do_binary  = True
+
+do_stats   = True # Perform a statistical analysis and include asterisks in the plot
+stat_test  = 'Mann-Whitney' # 't-test_ind' or 'Mann-Whitney''
+
+do_binary  = False
 hit_binary = 'LMO1'
-highlight_mutation=False
-mutation_gene='MYCN'
-mutation_aa_change='P44L'
-mutation_color='red'
-mutation_marker= 's'
-_mutation_marker_size = 30
 
+mut_show   = False
+mut_gene   = 'MYCN'
+mut_aa     = 'p.P44L'
+mut_col    = 'red'
+mut_mark   = "."
+mut_mark_s = 150
 
-SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=fontsize, set_ylim_0=set_ylim_0, list_n=list_n, sort_median=sort_median, do_binary=do_binary, hit_binary=hit_binary, order=order, highlight_mutation=highlight_mutation, mutation_gene=mutation_gene, mutation_aa_change=mutation_aa_change, mutation_color=mutation_color, _mutation_marker_size=_mutation_marker_size)
-# SubsetBoxplotter('SOX11', 'Classifying Driver', do_stats=False, highlight_mutation=highlight_mutation, mutation_gene=mutation_gene, mutation_aa_change=mutation_aa_change, mutation_marker=mutation_marker, mutation_color=mutation_color)
-# SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=16, order=order, set_ylim_0=set_ylim_0)
-# SubsetBoxplotter(gene, clin_col, do_stats=False, write_file=True, order=['ETP', 'Near-ETP', 'Non-ETP', 'Unknown'], list_n=list_n)
-
-# SubsetBoxplotter('AKT1',clin_col, do_stats=True, write_file=True)
+SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=fontsize, set_ylim_0=set_ylim_0, list_n=list_n, sort_median=sort_median, do_binary=do_binary, hit_binary=hit_binary, order=order, mut_show=mut_show, mut_gene=mut_gene, mut_aa=mut_aa, mut_col=mut_col,mut_mark=mut_mark, mut_mark_s=mut_mark_s, stat_test=stat_test)
 
 #%% =============================================================================
 # 6b Polonen - Create a plot for all categories for a set of genes
@@ -988,13 +994,13 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 
 Grapher_CCLR(
     gene1         = 'METTL3',
-    gene2         = 'TP53',
+    gene2         = 'TYMS',
     show_equation = False,
     log_scale     = False,
     set_lim_0     = False,
     label_points  = True,
     filter_col    = 'Hist_Subtype1',
-    filter_val    = 'acute_myeloid_leukaemia'
+    filter_val    = 'acute_lymphoblastic_T_cell_leukaemia'
     )
 
 print("\n[Filter Options]")
@@ -1010,13 +1016,13 @@ for col in filter_columns:
 # =============================================================================
 
 CCLE_Boxplotter(
-    gene       = 'ZFX',
-    group_by   = 'Gender',
+    gene       = 'DHFR',
+    group_by   = 'Hist_Subtype1',
     log_scale  = False,
     fig_height = 5,
-    fig_width  = 5,
+    fig_width  = 15,
     palette    = 'gray',
-    do_stats   = True
+    do_stats   = False
     )
 
 print("\n[Filter Options]")
