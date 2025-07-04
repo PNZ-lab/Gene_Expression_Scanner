@@ -132,7 +132,7 @@ IP Status
 ## Section 6 - Expression levels with patients split based on a clinical parameter
 
 #### Basic boxplot with gene expression split by ETP status, order variable should be set to None or a predefined order to appear in graph
-```
+```python
 clin_col   = 'ETP.STATUS'
 gene       = 'KDM6B'
 palette    = 'pastel'
@@ -153,7 +153,7 @@ hit_binary = 'Near-ETP'
 
 #### palette variable changes color scheme, set_ylim_0=True forces 0 to be included on the y-axis, do_stats=True performs a t-test and shows asterisks, list_n=True shows the number of samples, sort_mean=True orders the groups by their means, do_binary=True isolates all samples with hit_binary in clin_col and compares them to the rest
 
-```
+```python
 clin_col   = 'ETP.STATUS'
 gene       = 'KDM6B'
 palette    = 'Set2'
@@ -173,7 +173,7 @@ hit_binary = 'Near-ETP'
 
 #### mut_show highlights patients with a specific gene mutation
 
-```
+```python
 mut_show   = True
 mut_gene   = 'MYCN'
 mut_aa     = 'P44L'
@@ -187,7 +187,7 @@ mut_mark_s = 150
 
 ## Section 7 - Kaplan-Meier plots of event-free survival based on gene expression levels
 
-```
+```python
 gene = "IKZF1"
 KaplanMeier(gene)
 ```
@@ -200,7 +200,7 @@ e.g.
 
 ## Section 9 - Correlation plot of protein levels in six cell lines
 
-```
+```python
 protein_x = "EZH2"
 protein_y = "IGF2BP2"
 Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_MS)
@@ -211,7 +211,7 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 
 ## Section 10 - Correlation plot of gene-to-gene expression levels in CCLE data (cancer cell lines)
 
-```
+```python
 gene1         = 'RECQL4',
 gene2         = 'TONSL',
 show_equation = False,
@@ -226,11 +226,9 @@ filter_val    = 'acute_lymphoblastic_T_cell_leukaemia'
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/1b3b8052-a46b-47f0-8abd-3d57d4c0a7e1">
 
 
-
-
 ## Section 11 - Expression levels of a gene split by clinical parameters
 
-```
+```python
 CCLE_Boxplotter(
     gene       = 'ZFX',
     group_by   = 'Gender',
@@ -243,6 +241,35 @@ CCLE_Boxplotter(
 ```
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/466aab4b-c665-48e5-8bdb-3c02306b5ce1">
+
+## Section 12 - Plot the distribution of expression levels in patients for one gene
+
+```python
+Plot_Density('NOTCH1')
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/e1b13e67-aaef-4ec2-b846-c2b633ac5a61">
+
+
+## Section 13 - Investigate the distribution of a mutation (or all mutations) across the expression levels of a gene
+
+```python
+gene_mut   = 'NOTCH1' 
+mut_aa     = None 
+gene_split = 'SOX11'
+cutoff     = 3.81
+plot_abs   = False
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/58dbd045-c6fe-4a8b-8ba1-2353079e3b2a">
+
+```python
+plot_abs=True
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/47692b99-0ca4-4520-9afc-327a86c895b8">
+
+
 
 
 
