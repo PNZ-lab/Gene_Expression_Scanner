@@ -252,7 +252,7 @@ Plot_Density('NOTCH1')
 
 
 ## Section 13 - Investigate the distribution of a mutation (or all mutations) across the expression levels of a gene
-
+#### mut_aa=None records all non-synonymous mutations
 ```python
 gene_mut   = 'NOTCH1' 
 mut_aa     = None 
@@ -263,13 +263,24 @@ plot_abs   = False
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/465f42da-bb99-49ab-9545-87106837540f">
 
+Also writes the contingency table:
+
+```
+Has_Mutation   Mutated  Wildtype
+NOTCH1_Status                   
+Low                391       263
+High               474       181
+Odds Ratio: 0.568, P-value: 1.639e-06
+```
+
+#### plot_abs=True plots the absolute numbers instead of percentages
 
 ```python
-ene_mut   = 'MYCN' 
+gene_mut   = 'MYCN' 
 mut_aa     = 'P44L' 
 gene_split = 'SOX11'
 cutoff     = 3.81
-plot_abs   = False
+plot_abs   = True
 ```
 
 
