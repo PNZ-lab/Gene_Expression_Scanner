@@ -256,18 +256,24 @@ Plot_Density('NOTCH1')
 ```python
 gene_mut   = 'NOTCH1' 
 mut_aa     = None 
+gene_split = 'NOTCH'
+cutoff     = 13.36
+plot_abs   = False
+```
+
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/465f42da-bb99-49ab-9545-87106837540f">
+
+
+```python
+ene_mut   = 'MYCN' 
+mut_aa     = 'P44L' 
 gene_split = 'SOX11'
 cutoff     = 3.81
 plot_abs   = False
 ```
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/58dbd045-c6fe-4a8b-8ba1-2353079e3b2a">
 
-```python
-plot_abs=True
-```
-
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/47692b99-0ca4-4520-9afc-327a86c895b8">
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/5c6cd53f-e425-455c-8dfa-d2260b4976e5">
 
 
 
