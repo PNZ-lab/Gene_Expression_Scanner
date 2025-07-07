@@ -371,7 +371,8 @@ def SubsetBoxplotter(
     _dotcolor='white', _fontsize=14, order=None, set_ylim_0=False,
     list_n=False, sort_median=False, do_binary=False, hit_binary=None,
     mut_show=False, mut_gene=None, mut_aa=None,
-    mut_mark='s', mut_col='red', mut_mark_s=30, stat_test='Mann-Whitney', stat_text='star'
+    mut_mark='s', mut_col='red', mut_mark_s=30, stat_test='Mann-Whitney',
+    stat_text='star', fig_size=(8,8), dpi=200
 ):
     if gene not in df_gexp['Gene'].values:
         print(f"Gene '{gene}' not found in df_gexp.")
@@ -461,7 +462,7 @@ def SubsetBoxplotter(
             mutated_patients = set(mut_df['sample'])
 
     # ========== Plotting ==========
-    plt.figure(figsize=(6, 6), dpi=200)
+    plt.figure(figsize=fig_size, dpi=dpi)
     ax = sns.boxplot(data=data, x='Subtype_Labeled', y='Expression', palette=_palette,
                      showfliers=False, order=label_order)
 
@@ -1123,7 +1124,7 @@ dotcolor   = 'white' # The colors of the dots on top of the boxplots
 fontsize   = 12 # The size of the text items
 #order      = ['ETP', 'Near-ETP', 'Non-ETP'] # Specify the order. Set to None or make sure the items are represented in the clin_col
 order      = None
-set_ylim_0 = False # Force the 2nd axis to include 0
+set_ylim_0 = True # Force the 2nd axis to include 0
 write_file = True # Write the graph to a file. Will be written to out_dir
 list_n     = True # provide the number in each category
 sort_median= True
@@ -1142,7 +1143,10 @@ mut_col    = 'red'
 mut_mark   = "."
 mut_mark_s = 150
 
-SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=fontsize, set_ylim_0=set_ylim_0, list_n=list_n, sort_median=sort_median, do_binary=do_binary, hit_binary=hit_binary, order=order, mut_show=mut_show, mut_gene=mut_gene, mut_aa=mut_aa, mut_col=mut_col,mut_mark=mut_mark, mut_mark_s=mut_mark_s, stat_test=stat_test, stat_text=stat_text)
+fig_size   = (6, 6) # width, height
+dpi        = 200
+
+SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=fontsize, set_ylim_0=set_ylim_0, list_n=list_n, sort_median=sort_median, do_binary=do_binary, hit_binary=hit_binary, order=order, mut_show=mut_show, mut_gene=mut_gene, mut_aa=mut_aa, mut_col=mut_col,mut_mark=mut_mark, mut_mark_s=mut_mark_s, stat_test=stat_test, stat_text=stat_text, fig_size=fig_size, dpi=dpi)
 
 #%% =============================================================================
 # 6b Polonen - Create a plot for all categories for a set of genes
