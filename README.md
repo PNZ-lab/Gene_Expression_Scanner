@@ -4,7 +4,7 @@ The purpose of this script is to explore correlations between genes in the Polon
 2. Searching the CCLE cell line dataset for gene-to-gene correlations and contrast gene expression to clinical parameters.
 3. Searching our own cell line proteomics for gene-to-gene correlations.
 
-The script itself is divided into multiple sections (using lines starting with #%%):
+The script itself is divided into multiple sections (using lines starting with "#%%"):
 
 ## Section 1 - Description
 This is for the human reading the script itself to parse the ambition and use behind it.
