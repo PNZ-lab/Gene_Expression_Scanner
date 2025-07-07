@@ -4,8 +4,6 @@ The purpose of this script is to explore correlations between genes in the Polon
 2. Searching the CCLE cell line dataset for gene-to-gene correlations and contrast gene expression to clinical parameters.
 3. Searching our own cell line proteomics for gene-to-gene correlations.
 
-Sidenote: Some of the functionalities of this script can rely on KTC_functions.py to define a set of genes. This script supports you simply defining them by yourself, but if you want this functionality (e.g. Querying MSigDB for gene sets) - you can find KTC_functions.py on this GitHub.
-
 ## Section 1 - Description
 This is for the human reading the script itself to parse the ambition and use behind it.
 
@@ -15,6 +13,7 @@ This section reads and formats all the necessary data. The directory that contai
 cmgg_pnlab/Kasper/Data/Interesting_Lists
 ```
 But in_dir (and potentially the out_dir where files are written to) will need to be modified to match the relative path to that directory for the user launching the script.
+Some of the functionalities of this script can rely on KTC_functions.py to define a set of genes. This script supports you simply defining them by yourself, but if you want this functionality (e.g. Querying MSigDB for gene sets) - you can find KTC_functions.py on this GitHub. For this script to have access to KTC_functions.py the simplest solution is to have both scripts in the same folder.
 Running Section 2 (and Section 3) is mandatory. The analyses will not run without the data loaded into memory (Section 2) - or the functions to analyze the data (Section 3).
 
 ## Section 3 - Main Functions
