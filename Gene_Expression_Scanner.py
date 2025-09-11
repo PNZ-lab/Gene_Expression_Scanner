@@ -24,6 +24,7 @@ There are several applications of this script:
    - Script will create a graph and calculate Pearson's R and associated p-value for the two specified genes using cancer cell line data from CCLE
 9. Replace 'gene' and 'group_by' in section 11 and run that cell
    -  Script will create a series of boxplots for the expression levels for cancer cell lines in CCLE separated by unique values in a column in the annotation dataset
+10. This section analyzes TARGET + TCGA expression levels for many cancers
 
 Sidenote: Some of the functionalities of this script can rely on KTC_functions.py to define a set of genes. This script supports you simply defining them by yourself, but if you want this functionality (e.g. Querying MSigDB for gene sets) - you can find KTC_functions.py on this GitHub.
 '''
@@ -55,7 +56,7 @@ from scipy.stats import pearsonr, mannwhitneyu
 from statannotations.Annotator import Annotator
 from sklearn.linear_model import LinearRegression
 
-files_directory = '/Volumes/kachrist/shares/cmgg_pnlab/Kasper/Data/Interesting_Lists' #Directory where files for clinical and gene expression are stored
+files_directory = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists' #Directory where files for clinical and gene expression are stored
 out_dir         = '/Users/kachrist/Desktop/out_dir' # Directory where files and images are written. Subdirectories for individual genes are created
 
 #Initialization
@@ -135,6 +136,36 @@ clin_df.reset_index(inplace=True)
 clin_df.rename(columns={'index': 'Patient_ID'}, inplace=True)
 
 
+print("Loading in TARGET + TCGA data...")
+# === Load expression + metadata ===
+df_target_tcga_tpm  = pd.read_csv(os.path.join(files_directory, "tcga_target_no_normal_rsem_gene_tpm.gz"), sep="\t", index_col=0)
+df_target_tcga_meta = pd.read_csv(os.path.join(files_directory, "TCGA_TARGET_phenotype"), sep="\t", index_col=0)
+
+
+# === Load gene map ===
+df_target_tcga_map = pd.read_csv(
+    os.path.join(files_directory, "gencode.v23.annotation.gene.probemap"),
+    sep="\t", skiprows=1, header=None,
+    names=["ensembl", "gene", "chrom", "start", "end", "strand"]
+)
+
+# === Prepare expression data ===
+df_target_tcga_tpm = df_target_tcga_tpm.transpose()
+df_target_tcga_tpm.columns = df_target_tcga_tpm.columns.str.split(".").str[0]
+df_target_tcga_tpm = df_target_tcga_tpm.loc[:, df_target_tcga_tpm.columns.str.startswith("ENSG")]
+
+# Map Ensembl to symbols
+df_target_tcga_map["ensembl"] = df_target_tcga_map["ensembl"].str.split(".").str[0]
+ensembl_to_symbol = dict(zip(df_target_tcga_map["ensembl"], df_target_tcga_map["gene"]))
+df_target_tcga_tpm = df_target_tcga_tpm.rename(columns=ensembl_to_symbol)
+df_target_tcga_tpm = df_target_tcga_tpm.loc[:, df_target_tcga_tpm.columns.notnull()]
+df_target_tcga_tpm = df_target_tcga_tpm.T.groupby(level=0).mean().T  # collapse duplicated symbols
+
+# === Merge with metadata ===
+df_target_tcga_meta.index.name = "sample"
+df_target_tcga_merged = df_target_tcga_tpm.join(df_target_tcga_meta, how="inner")
+
+
 #Options
 print_corr_genes = False # Genes above and below breakpoints can be written directly to console
 write_files      = True # Turns on/off the writing of csv and pngs
@@ -145,13 +176,16 @@ show_breakpoint  = False # Identify and label breakpoints with Kneedle
 # =============================================================================
 
 def WriteFile(name):
-	print(name, target)
-	out_dir_target = os.path.join(out_dir, target)
-	if not os.path.exists(out_dir_target):
-		os.makedirs(out_dir_target)
-	if name.endswith('png') or name.endswith('svg'):
-		plt.savefig(os.path.join(out_dir_target, name))
-		print('file created: %s' %(os.path.join(out_dir_target, name)))
+    plt.savefig(os.path.join(out_dir, name))
+    print('file created: %s' %(os.path.join(out_dir, name)))
+
+#     print(name, target)
+# 	out_dir_target = os.path.join(out_dir, target)
+# 	if not os.path.exists(out_dir_target):
+# 		os.makedirs(out_dir_target)
+# 	if name.endswith('png') or name.endswith('svg'):
+# 		plt.savefig(os.path.join(out_dir_target, name))
+# 		print('file created: %s' %(os.path.join(out_dir_target, name)))
 
 # This function is called elsewhere to create pairwise correlation plots between two genes
 def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanalysis_col=None, subanalysis_hit=None, show_equation=False, set_lim_0=False, pval_scientific=False, top_n_residuals=0):
@@ -331,39 +365,70 @@ def WaterfallPlot(dictionary, target_gene, gene_set, label):
 
    return genes_above_elbow, genes_below_elbow
 
+def _safe_pearsonr(a: np.ndarray, b: np.ndarray):
+    """Pearson r with NaN/constant guards; returns (r, p) or (np.nan, np.nan)."""
+    m = np.isfinite(a) & np.isfinite(b)
+    ax, bx = a[m], b[m]
+    if ax.size < 2:
+        return np.nan, np.nan
+    if np.std(ax) == 0 or np.std(bx) == 0:
+        return np.nan, np.nan
+    return pearsonr(ax, bx)
 #This function calculates R and p values for all genes to one gene, returns a ranked list for the Waterfall function, and writes the csv
 def top_n_comparisons(gene, gene_set, label):
-   gene_values = df_gexp.loc[df_gexp['Gene'] == gene].iloc[0, 1:].values
-   r_dict = {}
-   all_genes = df_gexp['Gene']
+    # --- 1) Build a numeric matrix indexed by Gene once ---
+    # expects df_gexp with column 'Gene' and sample columns after it
+    df_num = df_gexp.copy()
+    if 'Gene' not in df_num.columns:
+        raise ValueError("df_gexp must contain a 'Gene' column.")
+    df_num = df_num.drop_duplicates(subset='Gene').set_index('Gene')
+    df_num = df_num.apply(pd.to_numeric, errors='coerce')  # coerce all to float
 
-   for other_gene in tqdm(all_genes, desc='Comparing genes', unit='gene'):
-      if other_gene != gene:
-         other_gene_values = df_gexp.loc[df_gexp['Gene'] == other_gene].iloc[0, 1:].values
-         r_value, pearson_p = pearsonr(gene_values, other_gene_values)
-         r_dict[other_gene] = (r_value, pearson_p)
+    if gene not in df_num.index:
+        raise ValueError(f"Gene '{gene}' not found in df_gexp.")
 
-   sorted_genes = sorted(r_dict.items(), key=lambda item: item[1][0], reverse=True)
-   genes_above_elbow, genes_below_elbow = WaterfallPlot(sorted_genes, gene, gene_set, label)
+    gene_values = df_num.loc[gene].to_numpy(dtype=float)
 
-   if write_files:
-      out_dir_target = os.path.join(out_dir, target)
-      if not os.path.exists(out_dir_target):
-         os.makedirs(out_dir_target)
-      data = []
-      for gene_name, (r_value, p_value) in sorted_genes:
-         if gene_name in genes_above_elbow:
-            category = 'above_1st_elbow'
-         elif gene_name in genes_below_elbow:
-            category = 'below_2nd_elbow'
-         else:
-            category = 'neither'
-         data.append([gene_name, r_value, p_value, category])
-      df_result = pd.DataFrame(data, columns=['Gene', 'Pearson_r', 'p_value', 'Category'])
-      df_result.to_csv(os.path.join(out_dir_target, '%s_correlation_data.csv' %(gene)), index=False)
-      print('file created: %s' %(out_dir_target))
+    r_dict = {}
+    all_genes = df_num.index.tolist()
 
-   return(sorted_genes[:round(top_n/2)], sorted_genes[-round(top_n/2):])
+    # --- 2) Compare against every other gene safely ---
+    for other_gene in tqdm(all_genes, desc='Comparing genes', unit='gene'):
+        if other_gene == gene:
+            continue
+        other_gene_values = df_num.loc[other_gene].to_numpy(dtype=float)
+        r_value, pearson_p = _safe_pearsonr(gene_values, other_gene_values)
+        r_dict[other_gene] = (r_value, pearson_p)
+
+    # --- 3) Sort by r (descending), putting NaNs at the end ---
+    def sort_key(item):
+        r = item[1][0]
+        return (-1e9 if np.isnan(r) else r)
+
+    sorted_genes = sorted(r_dict.items(), key=sort_key, reverse=True)
+
+    # --- 4) WaterfallPlot + export (uses your existing globals) ---
+    genes_above_elbow, genes_below_elbow = WaterfallPlot(sorted_genes, gene, gene_set, label)
+
+    if write_files:
+        out_dir_target = os.path.join(out_dir, target)
+        os.makedirs(out_dir_target, exist_ok=True)
+        rows = []
+        for gene_name, (r_value, p_value) in sorted_genes:
+            if gene_name in genes_above_elbow:
+                category = 'above_1st_elbow'
+            elif gene_name in genes_below_elbow:
+                category = 'below_2nd_elbow'
+            else:
+                category = 'neither'
+            rows.append([gene_name, r_value, p_value, category])
+        df_result = pd.DataFrame(rows, columns=['Gene', 'Pearson_r', 'p_value', 'Category'])
+        df_result.to_csv(os.path.join(out_dir_target, f'{gene}_correlation_data.csv'), index=False)
+        print(f'file created: {out_dir_target}')
+
+    # --- 5) Return top/bottom N (uses your global top_n) ---
+    n = int(round(top_n/2))
+    return (sorted_genes[:n], sorted_genes[-n:])
 
 
 def SubsetBoxplotter(
@@ -372,7 +437,7 @@ def SubsetBoxplotter(
     list_n=False, sort_median=False, do_binary=False, hit_binary=None,
     mut_show=False, mut_gene=None, mut_aa=None,
     mut_mark='s', mut_col='red', mut_mark_s=30, stat_test='Mann-Whitney',
-    stat_text='star', fig_size=(8,8), dpi=200
+    stat_text='star', fig_size=(8,8), dpi=200, plot_type='boxplot'
 ):
     if gene not in df_gexp['Gene'].values:
         print(f"Gene '{gene}' not found in df_gexp.")
@@ -389,11 +454,6 @@ def SubsetBoxplotter(
 
     values = filtered_df_gexp.iloc[0].tolist()
     clin_lookup = clin_df.set_index('Patient_ID')
-
-    from collections import defaultdict
-    from itertools import combinations
-    import seaborn as sns
-    from statannotations.Annotator import Annotator
 
     # ========= BINARY MODE =========
     if do_binary and PECAN_col and hit_binary:
@@ -463,12 +523,38 @@ def SubsetBoxplotter(
 
     # ========== Plotting ==========
     plt.figure(figsize=fig_size, dpi=dpi)
-    ax = sns.boxplot(data=data, x='Subtype_Labeled', y='Expression', palette=_palette,
-                     showfliers=False, order=label_order)
+    if plot_type == 'boxplot':
+        ax = sns.boxplot(
+            data=data, x='Subtype_Labeled', y='Expression',
+            palette=_palette, showfliers=False, order=label_order
+        )
+    elif plot_type == 'violinplot':
+        ax = sns.violinplot(
+            data=data, x='Subtype_Labeled', y='Expression',
+            palette=_palette, inner=None, order=label_order,
+            cut=0, linewidth=1
+        )
+        # Draw median lines manually
+        medians = data.groupby("Subtype_Labeled")["Expression"].median()
+        
+        for i, label in enumerate(label_order):
+            median_val = medians[label]
+            ax.hlines(
+                y=median_val,
+                xmin=i - 0.2, xmax=i + 0.2,
+                color="black", linewidth=1.5, zorder=4
+            )
+    else:
+        print('plot_type must be either "boxplot" or "violinplot"')
 
-    sns.stripplot(data=data[~data['Patient_ID'].isin(mutated_patients)],
-                  x='Subtype_Labeled', y='Expression', facecolor=_dotcolor,
-                  edgecolor='black', linewidth=0.8, alpha=0.2, jitter=True, order=label_order)
+    # === Always overlay stripplot ===
+    sns.stripplot(
+        data=data[~data['Patient_ID'].isin(mutated_patients)],
+        x='Subtype_Labeled', y='Expression',
+        facecolor=_dotcolor, edgecolor='black',
+        linewidth=0.8, alpha=0.3, jitter=True,
+        order=label_order, zorder=2
+    )
 
     if mut_show:
         mut_data = data[data['Patient_ID'].isin(mutated_patients)]
@@ -479,15 +565,28 @@ def SubsetBoxplotter(
         plt.legend()
 
     if do_stats and data['Subtype'].nunique() >= 2:
-        pairs = list(combinations(data['Subtype'].dropna().unique(), 2))
-        annotator = Annotator(ax, pairs, data=data, x='Subtype', y='Expression')
-        if stat_text == 'star':
-            annotator.configure(test=stat_test, text_format='star', loc='inside', verbose=1)
-        elif stat_text == 'full':
-            annotator.configure(test=stat_test, text_format='full', loc='inside', verbose=0)
-        # annotator.configure(test='t-test_ind', text_format='star', loc='inside', verbose=0)
+        # 1) Use the same order as the plot
+        pairs = [(label_order[i], label_order[j])
+                 for i in range(len(label_order)) for j in range(i+1, len(label_order))]
+
+        annotator = Annotator(
+            ax, pairs, data=data,
+            x='Subtype_Labeled',
+            y='Expression',
+            order=label_order
+        )
+
+        # 2) Put annotations above the violins (cleanest) and give offsets
+        cfg = dict(test=stat_test, text_format=stat_text, loc='outside',
+                   line_height=0.02, line_offset=0.02, text_offset=0.01,
+                   verbose=0)
+        annotator.configure(**cfg)
         annotator.hide_non_significant = True
         annotator.apply_and_annotate()
+
+        # 3) Ensure there's headroom for the stars
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim(ymin, ymax + 0.1 * (ymax - ymin))
 
     plt.title(f'PeCan expression of {gene} grouped by: \"{PECAN_col}\"', fontsize=_fontsize)
     plt.xlabel(PECAN_col, fontsize=_fontsize)
@@ -635,48 +734,93 @@ def Grapher_MSpr1(protein1, protein2, df_msdataset, log_scale=False, show_equati
     plt.savefig(f'MS_Correlation_{actual_protein1}_vs_{actual_protein2}.svg')
     plt.show()
 
-def KaplanMeier(_gene):
-    # Ensure matching Patient_IDs
-    matched_clin_df = clin_df[clin_df['Patient_ID'].isin(df_gexp.columns)]
-    
-    # Extract expression values for the selected gene
-    gene_expression = df_gexp.set_index("Gene").loc[_gene, matched_clin_df['Patient_ID']]
-    
-    # Compute the median expression
-    median_expression = gene_expression.median()
-    
-    # Split into High and Low expression groups
-    matched_clin_df["Expression_Group"] = ["High" if gene_expression[pid] > median_expression else "Low" for pid in matched_clin_df["Patient_ID"]]
-    
-    # Extract survival data
-    time_high = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "High", "EFS"]
-    event_high = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "High", "EFS.status"]
-    time_low = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "Low", "EFS"]
-    event_low = matched_clin_df.loc[matched_clin_df["Expression_Group"] == "Low", "EFS.status"]
-    
-    # Initialize Kaplan-Meier fitters
-    kmf_high = KaplanMeierFitter()
-    kmf_low = KaplanMeierFitter()
-    
-    # Fit data for both groups
-    kmf_high.fit(time_high, event_high, label="High Expression")
-    kmf_low.fit(time_low, event_low, label="Low Expression")
-    
-    # Perform log-rank test
-    logrank_p = logrank_test(time_high, time_low, event_high, event_low).p_value
-    
-    # Plot survival curves
-    plt.figure(figsize=(6,5),dpi=200)
-    plt.ylim(0)
-    kmf_high.plot_survival_function()
-    kmf_low.plot_survival_function()
-    plt.title(f"Kaplan-Meier Survival by {_gene} Expression (p value: %.4f)" %(logrank_p))
+def KaplanMeier(
+    _gene,
+    n_groups=2,                     # 2 = median split; 4 = quartiles; any int >=2 works
+    id_col="Patient_ID",
+    time_col="EFS",
+    event_col="EFS.status",
+    dpi=200,                        # your default preference
+    out_dir=None,                   # if given, will save a figure
+    filename=None                   # custom filename if desired
+):
+    # 1) Align clinical and expression data
+    matched = clin_df[clin_df[id_col].isin(df_gexp.columns)].copy()
+    expr_series = df_gexp.set_index("Gene").loc[_gene, matched[id_col]].astype(float)
+    matched["Expression"] = matched[id_col].map(expr_series)
+
+    # Drop rows with missing essentials
+    matched = matched.dropna(subset=["Expression", time_col, event_col]).copy()
+    matched[event_col] = matched[event_col].astype(int)
+
+    # 2) Build groups
+    if n_groups == 2:
+        med = matched["Expression"].median()
+        matched["KM_Group"] = np.where(matched["Expression"] > med, "High", "Low")
+        group_order = ["Low", "High"]
+        title_part = "High vs Low (median split)"
+    else:
+        # Try qcut directly; fall back to ranking if bin edges collide
+        labels = [f"Q{i+1}" for i in range(n_groups)]
+        try:
+            matched["KM_Group"] = pd.qcut(matched["Expression"], q=n_groups, labels=labels)
+            # Ensure we got the requested number of groups; if not, fallback to rank-based
+            if matched["KM_Group"].nunique() < n_groups:
+                raise ValueError("Collapsed bins in qcut; using rank-based qcut.")
+        except Exception:
+            ranked = matched["Expression"].rank(method="first")
+            matched["KM_Group"] = pd.qcut(ranked, q=n_groups, labels=labels)
+
+        group_order = labels  # Q1(lowest) ... Qn(highest)
+        title_part = f"{n_groups} quantiles"
+
+    # 3) Compute p-value (pairwise or multivariate log-rank)
+    if n_groups == 2:
+        g_low  = matched.query("KM_Group == 'Low'")
+        g_high = matched.query("KM_Group == 'High'")
+        p_value = logrank_test(
+            g_high[time_col], g_low[time_col],
+            event_observed_A=g_high[event_col],
+            event_observed_B=g_low[event_col]
+        ).p_value
+    else:
+        mlr = multivariate_logrank_test(
+            matched[time_col], matched["KM_Group"], matched[event_col]
+        )
+        p_value = float(mlr.p_value)
+
+    # 4) Plot
+    plt.figure(figsize=(6,5), dpi=dpi)
+    ax = None
+    for grp in group_order:
+        sub = matched.loc[matched["KM_Group"] == grp]
+        if sub.empty:
+            continue
+        kmf = KaplanMeierFitter()
+        label = f"{grp} (n={len(sub)})"
+        kmf.fit(durations=sub[time_col], event_observed=sub[event_col], label=label)
+        ax = kmf.plot_survival_function(ci_show=True, ax=ax)
+
+    plt.ylim(0, 1)
     plt.xlabel("Days (Event-free survival)")
     plt.ylabel("Survival Probability")
+    plt.title(f"{_gene} — Kaplan–Meier by expression: {title_part}\nlog-rank p = {p_value:.4g}")
     plt.legend()
-    plt.grid()
-    WriteFile(os.path.join(out_dir, '%s_KaplanMeier.svg' %(_gene)))
+    plt.grid(True, alpha=0.3)
+
+    # 5) Save if requested (compatible with your WriteFile helper if present)
+    if out_dir is not None:
+        if filename is None:
+            suffix = "quartiles" if n_groups == 4 else (f"{n_groups}quantiles" if n_groups != 2 else "median")
+            filename = f"{_gene}_KaplanMeier_{suffix}.svg"
+        out_path = os.path.join(out_dir, filename)
+        try:
+            WriteFile(out_path)  # your helper, if defined
+        except NameError:
+            plt.savefig(out_path, bbox_inches="tight")
+
     plt.show()
+    return p_value, matched[[id_col, "Expression", "KM_Group"]].copy()
 
 
 from lifelines.statistics import multivariate_logrank_test
@@ -695,16 +839,18 @@ def KaplanMeier_clinical(clin_column):
 
     kmf = KaplanMeierFitter()
     plt.figure(figsize=(7, 5), dpi=200)
-    plt.title(f"Kaplan-Meier Survival by {clin_column}", fontsize=13)
     plt.xlabel("Days (Event-Free Survival)", fontsize=11)
     plt.ylabel("Survival Probability", fontsize=11)
 
-    for group in unique_groups:
+    # Dynamically generate a color palette
+    colors = sns.color_palette("tab20", n_colors=len(unique_groups))
+
+    for color, group in zip(colors, unique_groups):
         mask = df[clin_column] == group
         n_patients = mask.sum()
         label = f"{group} (n={n_patients})"
         kmf.fit(df.loc[mask, 'EFS'], df.loc[mask, 'EFS.status'], label=label)
-        kmf.plot_survival_function(ci_show=False)
+        kmf.plot_survival_function(ci_show=False, color=color)
 
     # Perform multivariate log-rank test
     results = multivariate_logrank_test(df['EFS'], df[clin_column], df['EFS.status'])
@@ -712,9 +858,9 @@ def KaplanMeier_clinical(clin_column):
 
     plt.grid()
     plt.legend(title=clin_column, bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.ylim(0)
+    plt.ylim(0, 1)
     plt.tight_layout()
-    plt.title(f"KM Survival by {clin_column} (p={pval:.4f})")
+    plt.title(f"KM Survival by {clin_column} (p={pval:.4f})", fontsize=13)
     WriteFile(os.path.join(out_dir, f'{clin_column}_KM.svg'))
     plt.show()
 
@@ -814,7 +960,11 @@ def CCLE_Boxplotter(
     fig_height=8,
     fig_width=8,
     palette='gray',
-    do_stats=False
+    do_stats=False,
+    min_samples=5,
+    ylim=0,
+    include_terms=None,       # list of specific group terms to plot
+    highlight_labels=None     # NEW: list of group names to make red
 ):
     # --- Step 1: Get expression data for the gene ---
     gene_expr = df_CCLE_rpkm.loc[df_CCLE_rpkm['Description'] == gene] \
@@ -831,20 +981,29 @@ def CCLE_Boxplotter(
     plot_data = plot_data.merge(df_CCLE_cl[['CCLE_ID', group_by]], on='CCLE_ID', how='left')
     plot_data = plot_data.dropna(subset=[group_by])
 
-    # --- Step 3: Log-transform if needed ---
+    # --- Step 3: Optional filter to only specified terms ---
+    if include_terms is not None:
+        plot_data = plot_data[plot_data[group_by].isin(include_terms)]
+
+    # --- Step 4: Filter out groups with fewer than min_samples ---
+    group_counts = plot_data[group_by].value_counts()
+    valid_groups = group_counts[group_counts >= min_samples].index
+    plot_data = plot_data[plot_data[group_by].isin(valid_groups)]
+
+    # --- Step 5: Log-transform if needed ---
     if log_scale:
         plot_data['Expression'] = np.log10(plot_data['Expression'] + 1)
         ylabel = 'log10(RPKM + 1)'
     else:
         ylabel = 'RPKM'
 
-    # --- Step 4: Order groups by median expression ---
+    # --- Step 6: Order groups by median expression ---
     group_order = plot_data.groupby(group_by)['Expression'] \
                            .median() \
                            .sort_values(ascending=False) \
                            .index.tolist()
 
-    # --- Step 5: Plot ---
+    # --- Step 7: Plot ---
     plt.figure(figsize=(fig_width, fig_height), dpi=300)
     ax = sns.boxplot(
         x=group_by,
@@ -854,7 +1013,7 @@ def CCLE_Boxplotter(
         palette=palette
     )
 
-    # --- Step 6: Optional statistical annotations ---
+    # --- Step 8: Optional statistical annotations ---
     if do_stats and plot_data[group_by].nunique() >= 2:
         pairs = list(combinations(group_order, 2))
         annotator = Annotator(ax, pairs, data=plot_data, x=group_by, y='Expression')
@@ -862,12 +1021,20 @@ def CCLE_Boxplotter(
         annotator.hide_non_significant = True
         annotator.apply_and_annotate()
 
-    # --- Step 7: Final plot settings ---
+    # --- Step 9: Highlight tick labels if requested ---
+    if highlight_labels:
+        for label in ax.get_xticklabels():
+            if label.get_text() in highlight_labels:
+                label.set_color('red')
+                label.set_fontweight('bold')
+
+    # --- Step 10: Final plot settings ---
     plt.title(f'{gene} Expression by {group_by}', fontsize=22)
     plt.xlabel(group_by, fontsize=18)
     plt.ylabel(ylabel, fontsize=18)
     plt.xticks(rotation=90)
     plt.tick_params(axis='both', labelsize=16)
+    plt.ylim(bottom=ylim)
     plt.tight_layout()
     plt.show()
 
@@ -1064,6 +1231,40 @@ def Plot_Density(gene):
     WriteFile(os.path.join(out_dir, f'{gene}_Density.svg'))
     plt.show()
 
+
+# === Plotting function ===
+def TCGA_TARGET_expression(gene):
+    if gene not in df_target_tcga_merged.columns:
+        print(f"{gene} not found.")
+        return
+
+    subset = df_target_tcga_merged[[gene, "_study", "_primary_disease"]].dropna()
+
+    # Duplicate T-ALL rows and relabel _primary_disease and _study
+    # tall_labeled = subset[subset["TALL_status"]].copy()
+    # tall_labeled["_primary_disease"] = "T-ALL (only)"
+    # tall_labeled["_study"] = "T-ALL-only"  # New hue category
+    # print(tall_labeled)
+
+    # Append to existing data
+    # subset_combined = pd.concat([subset, tall_labeled])
+
+    # Create x-axis order (including new label)
+    ordered = subset.groupby("_primary_disease")[gene].median().sort_values(ascending=False).index
+
+    # Plot
+    plt.figure(figsize=(14, 6), dpi=200)
+    sns.boxplot(data=subset, x="_primary_disease", y=gene, hue="_study", order=ordered, fliersize=0, linewidth=1)
+
+    plt.xticks(rotation=90)
+    plt.title(f"{gene} expression across TCGA and TARGET tumors)")
+    plt.ylabel("log2(TPM + 0.001)" if subset[gene].max() < 100 else "TPM")
+    plt.xlabel("Cancer type")
+    plt.legend(title="Cohort", loc='upper right')
+    plt.tight_layout()
+    plt.show()
+
+
 #%% ===========================================================================
 # 4. Run this cell to scan for best correlations for one gene
 # =============================================================================
@@ -1073,7 +1274,7 @@ gene_set = KTC_GetGeneSet('splicing_factors')
 label = ', '.join(KTC_GetGeneSet('splicing_factors'))
 
 # Every gene in the list below ('targets') will have all gene-gene correlations to it calculated and plotted.
-targets = ['TONSL']
+targets = ['PCNA']
 
 top_n            = 10 # E.g. 10 will generate graphs for the 5 most positive and most negatively correlated genes
 for target in targets:
@@ -1090,14 +1291,14 @@ for target in targets:
 # =============================================================================
 #Overwrite 'target' and 'target2' and run this cell
 #File is saved in out_dir/[target]
-target  = 'METTL3' # The expression of the gene on the 1st axis
-target2 = 'TP53' # The expression of the gene on the 2nd axis
+target  = 'MYC' # The expression of the gene on the 1st axis
+target2 = 'TONSL' # The expression of the gene on the 2nd axis
 show_equation    = False
 split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
 set_lim_0        = False
 subanalysis_do   = False # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
 subanalysis_col  = 'Subtype' # This column in the clinical data will be used to separate patients into two groups
-subanalysis_hit  = 'ETP-like' # This value in the column above will be used to separate patients into two groups
+subanalysis_hit  = 'SPI1' # This value in the column above will be used to separate patients into two groups
 pval_scientific  = True
 top_n_residuals  = 0
 
@@ -1105,7 +1306,7 @@ top_n_residuals  = 0
 Grapher(target, target2, split_by_subtype,subanalysis_do=subanalysis_do, subanalysis_col=subanalysis_col, subanalysis_hit=subanalysis_hit,  show_equation=show_equation, set_lim_0=set_lim_0, pval_scientific=pval_scientific, top_n_residuals=top_n_residuals)
 
 #%% 5b. Run all permutations for a set.
-genes = ['MTOR', 'TYMS']
+genes = ['PCNA', 'DHFR', 'NAMPT']
 gene_combinations = set(itertools.combinations(genes, 2))
 for target, target2 in gene_combinations:
     Grapher(target, target2, split_by_subtype, subanalysis_do=subanalysis_do, 
@@ -1117,24 +1318,26 @@ for target, target2 in gene_combinations:
 # 6. Analyze levels of expression across clinical parameters
 # =============================================================================
 
-clin_col   = 'Subtype' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
-gene       = 'KDM6B' # The gene whose expression you want to track
+clin_col   = 'ETP.STATUS' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
+gene       = 'TYMS' # The gene whose expression you want to track
 palette    = 'gray'  # The colors used in the graph. Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
 dotcolor   = 'white' # The colors of the dots on top of the boxplots
 fontsize   = 12 # The size of the text items
 #order      = ['ETP', 'Near-ETP', 'Non-ETP'] # Specify the order. Set to None or make sure the items are represented in the clin_col
 order      = None
-set_ylim_0 = True # Force the 2nd axis to include 0
+set_ylim_0 = False # Force the 2nd axis to include 0
 write_file = True # Write the graph to a file. Will be written to out_dir
 list_n     = True # provide the number in each category
 sort_median= True
 
+plot_type  = 'boxplot' # 'boxplot' or 'violinplot'
+
 do_stats   = True # Perform a statistical analysis and include asterisks in the plot
 stat_test  = 'Mann-Whitney' # 't-test_ind' or 'Mann-Whitney''
-stat_text  = 'full' # 'star' for asterisks, 'full', for p-value
+stat_text  = 'star' # 'star' for asterisks, 'full', for p-value
 
 do_binary  = True
-hit_binary = 'ETP-like'
+hit_binary = 'ETP'
 
 mut_show   = False
 mut_gene   = 'MYCN'
@@ -1143,10 +1346,12 @@ mut_col    = 'red'
 mut_mark   = "."
 mut_mark_s = 150
 
-fig_size   = (6, 6) # width, height
+fig_size   = (4.5, 6) # width, height
 dpi        = 200
 
-SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=fontsize, set_ylim_0=set_ylim_0, list_n=list_n, sort_median=sort_median, do_binary=do_binary, hit_binary=hit_binary, order=order, mut_show=mut_show, mut_gene=mut_gene, mut_aa=mut_aa, mut_col=mut_col,mut_mark=mut_mark, mut_mark_s=mut_mark_s, stat_test=stat_test, stat_text=stat_text, fig_size=fig_size, dpi=dpi)
+SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=fontsize, set_ylim_0=set_ylim_0, list_n=list_n, sort_median=sort_median, do_binary=do_binary, hit_binary=hit_binary, order=order, mut_show=mut_show, mut_gene=mut_gene, mut_aa=mut_aa, mut_col=mut_col,mut_mark=mut_mark, mut_mark_s=mut_mark_s, stat_test=stat_test, stat_text=stat_text, fig_size=fig_size, dpi=dpi, plot_type=plot_type)
+
+
 
 #%% =============================================================================
 # 6b Polonen - Create a plot for all categories for a set of genes
@@ -1165,8 +1370,8 @@ for cc in clin_cols:
 # 7. Polonen - Generate a Kaplan Meier plot of event-free survival for one gene
 # =============================================================================
 
-gene = 'METTL3'
-KaplanMeier(gene)
+gene = 'TONSL'
+KaplanMeier(gene, n_groups=2)
 
 #%% ===========================================================================
 # 8. Polonen - Generate a Kaplan Meier plot for all clinical parameters
@@ -1189,8 +1394,8 @@ for col in clin_cols:
 # 9. Our own cell line MS data - Compare gene expression level trends
 # =============================================================================
 
-protein_x = 'METTL3'
-protein_y = 'TP53'
+protein_x = 'NOTCH1'
+protein_y = 'NAMPT'
 Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_MS)
 
 
@@ -1199,8 +1404,8 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 # =============================================================================
 
 Grapher_CCLR(
-    gene_x        = 'DHFR',
-    gene_y        = 'TYMS',
+    gene_x        = 'NOTCH1',
+    gene_y        = 'NAMPT',
     show_equation = False,
     log_scale     = False,
     set_lim_0     = False,
@@ -1221,26 +1426,43 @@ for col in filter_columns:
 # 11. CCLE (cancer cell lines) data - one gene across different categories
 # =============================================================================
 
-CCLE_Boxplotter(
-    gene       = 'DHFR',
-    group_by   = 'Hist_Subtype1',
-    log_scale  = False,
-    fig_height = 5,
-    fig_width  = 15,
-    palette    = 'gray',
-    do_stats   = False
-    )
-
-print("\n[Filter Options]")
-for col in filter_columns:
-    print(f'\t{col}')
+for gene in KTC_GetGeneSet('Laura'):
+    
+    try:
+        CCLE_Boxplotter(
+            gene          = gene,
+            group_by      = 'Hist_Subtype1',
+            log_scale     = False,
+            fig_height    = 5,
+            fig_width     = 6,
+            palette       = 'gray',
+            do_stats      = False,
+            min_samples   = 5,
+            ylim          = 0,
+            include_terms = ['acute_lymphoblastic_B_cell_leukaemia', 'acute_lymphoblastic_T_cell_leukaemia', 'acute_myeloid_leukaemia'],
+            )
+        
+        CCLE_Boxplotter(
+            gene          = gene,
+            group_by      = 'Hist_Subtype1',
+            log_scale     = False,
+            fig_height    = 5,
+            fig_width     = 15,
+            palette       = 'gray',
+            do_stats      = False,
+            min_samples   = 5,
+            ylim          = 0,
+            highlight_labels=['acute_lymphoblastic_B_cell_leukaemia', 'acute_lymphoblastic_T_cell_leukaemia', 'acute_myeloid_leukaemia']
+            )
+    except:
+        print(f'failed for {gene}')
 
 
 #%% ===========================================================================
 # 12. Plot the distribtution of expression levels in patients for one gene
 # =============================================================================
 
-Plot_Density('NOTCH1')
+Plot_Density('TONSL')
 
 #%% ===========================================================================
 # 13. Mutation_Barplotter (investigates mutations based on expression levels)
@@ -1255,5 +1477,8 @@ plot_abs   = False
 Mutation_Barplotter(gene_mut, gene_split, cutoff, mut_aa, plot_abs)
 Mutation_Barplotter(gene_mut, gene_split, cutoff, mut_aa, plot_abs=True)
 
+#%% =============================================================================
+# Plotting gene expression levels across many cancers (TARGET + TCGA)
+# =============================================================================
 
-
+TCGA_TARGET_expression("TONSL")
