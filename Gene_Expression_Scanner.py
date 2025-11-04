@@ -35,6 +35,7 @@ Sidenote: Some of the functionalities of this script can rely on KTC_functions.p
 
 #Modules
 import os
+import mygene
 import itertools
 import numpy as np
 import pandas as pd
@@ -60,6 +61,7 @@ files_directory = '/Volumes/cmgg_pnlab/Kasper/Data/Interesting_Lists' #Directory
 out_dir         = '/Users/kachrist/Desktop/out_dir' # Directory where files and images are written. Subdirectories for individual genes are created
 
 #Initialization
+print('--- Loading data into memory ----')
 print("Loading gene expression data...")
 df_gexp                  = pd.read_csv(os.path.join(files_directory, 'PeCan_gexp.csv'))
 print("Loading clinical data...")
@@ -165,12 +167,34 @@ df_target_tcga_tpm = df_target_tcga_tpm.T.groupby(level=0).mean().T  # collapse 
 df_target_tcga_meta.index.name = "sample"
 df_target_tcga_merged = df_target_tcga_tpm.join(df_target_tcga_meta, how="inner")
 
+print('Loading in TCGA healthy v tumor')
+path_TCGA_expr     = os.path.join(files_directory, 'tcga_toil_merged.parquet')
+df_TCGA_expr       = pd.read_parquet(path_TCGA_expr)
+path_TCGA_surviv   = os.path.join(files_directory, 'tcga_survival.txt')
+df_TCGA_surviv     = pd.read_csv(path_TCGA_surviv, sep='\t')
+
+df_TCGA_expr = df_TCGA_expr.copy()
+df_TCGA_expr["PATIENT"] = df_TCGA_expr.index.str.slice(0,12)
+
+df_surv_ready = df_TCGA_expr.merge(
+    df_TCGA_surviv,
+    left_on="PATIENT",
+    right_on="_PATIENT",   # in your survival table
+    how="inner"
+)
+
+print('--- Data loaded succesfully ----')
+
+
 
 #Options
 print_corr_genes = False # Genes above and below breakpoints can be written directly to console
 write_files      = True # Turns on/off the writing of csv and pngs
 log_scale        = False
 show_breakpoint  = False # Identify and label breakpoints with Kneedle
+
+mg = mygene.MyGeneInfo()
+
 #%% ===========================================================================
 # 3. Main functions
 # =============================================================================
@@ -179,13 +203,13 @@ def WriteFile(name):
     plt.savefig(os.path.join(out_dir, name))
     print('file created: %s' %(os.path.join(out_dir, name)))
 
-#     print(name, target)
-# 	out_dir_target = os.path.join(out_dir, target)
-# 	if not os.path.exists(out_dir_target):
-# 		os.makedirs(out_dir_target)
-# 	if name.endswith('png') or name.endswith('svg'):
-# 		plt.savefig(os.path.join(out_dir_target, name))
-# 		print('file created: %s' %(os.path.join(out_dir_target, name)))
+    print(name, target)
+    out_dir_target = os.path.join(out_dir, target)
+    if not os.path.exists(out_dir_target):
+        os.makedirs(out_dir_target)
+    if name.endswith('png') or name.endswith('svg'):
+        plt.savefig(os.path.join(out_dir_target, name))
+        print('file created: %s' %(os.path.join(out_dir_target, name)))
 
 # This function is called elsewhere to create pairwise correlation plots between two genes
 def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanalysis_col=None, subanalysis_hit=None, show_equation=False, set_lim_0=False, pval_scientific=False, top_n_residuals=0):
@@ -240,7 +264,7 @@ def Grapher(gene1, gene2, split_by_subtype=False, subanalysis_do=False, subanaly
                 plt.xlabel(gene1 + ' Expression (VST)', fontsize=18)
                 plt.ylabel(gene2 + ' Expression (VST)', fontsize=18)
                 plt.tick_params(axis='both', labelsize=16)
-                plt.title('PECAN expression: %s v %s\nSubset of patients with subtype: (%s)' % (gene1, gene2, subtype), fontsize=22)
+                plt.title('Polonen expression: %s v %s\nSubset of patients with subtype: (%s)' % (gene1, gene2, subtype), fontsize=22)
                 plt.legend(fontsize=16)
                 file_name = 'PECAN_correlation_%s_v_%s_%s.svg' % (gene1, gene2, subtype.replace('/','_'))
                 if set_lim_0 == True:
@@ -1232,49 +1256,285 @@ def Plot_Density(gene):
     plt.show()
 
 
-# === Plotting function ===
-def TCGA_TARGET_expression(gene):
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+
+def TCGA_TARGET_expression(
+    gene,
+    filter_diseases=None,
+    figsize=(14, 6),
+    point_alpha=0.2,
+    point_size=10
+):
     if gene not in df_target_tcga_merged.columns:
         print(f"{gene} not found.")
         return
 
     subset = df_target_tcga_merged[[gene, "_study", "_primary_disease"]].dropna()
 
-    # Duplicate T-ALL rows and relabel _primary_disease and _study
-    # tall_labeled = subset[subset["TALL_status"]].copy()
-    # tall_labeled["_primary_disease"] = "T-ALL (only)"
-    # tall_labeled["_study"] = "T-ALL-only"  # New hue category
-    # print(tall_labeled)
+    if filter_diseases is not None:
+        subset = subset[subset["_primary_disease"].isin(filter_diseases)]
+        if subset.empty:
+            print(f"No rows left after filtering to {filter_diseases}")
+            return
 
-    # Append to existing data
-    # subset_combined = pd.concat([subset, tall_labeled])
-
-    # Create x-axis order (including new label)
+    # order categories by median expression
     ordered = subset.groupby("_primary_disease")[gene].median().sort_values(ascending=False).index
 
-    # Plot
-    plt.figure(figsize=(14, 6), dpi=200)
-    sns.boxplot(data=subset, x="_primary_disease", y=gene, hue="_study", order=ordered, fliersize=0, linewidth=1)
+    # draw the boxplots (dodge by cohort)
+    plt.figure(figsize=figsize, dpi=200)
+    ax = sns.boxplot(
+        data=subset,
+        x="_primary_disease",
+        y=gene,
+        hue="_study",
+        order=ordered,
+        fliersize=0,
+        linewidth=1
+    )
 
+    # --- perfectly aligned black dots ---
+    # map x positions for each disease category
+    x_pos = {cat: i for i, cat in enumerate(ordered)}
+
+    # iterate per disease and cohort; choose offset:
+    # - if both TCGA and TARGET present: offsets = (-0.2, +0.2)
+    # - if only one cohort present: offset = 0 (centered under the single box)
+    for cat in ordered:
+        cat_df = subset[subset["_primary_disease"] == cat]
+        cohorts_present = cat_df["_study"].unique().tolist()
+        both = set(cohorts_present) == {"TCGA", "TARGET"}
+        offsets = {"TCGA": -0.2, "TARGET": 0.2} if both else {"TCGA": 0.0, "TARGET": 0.0}
+
+        for cohort in cohorts_present:
+            d = cat_df[cat_df["_study"] == cohort]
+            # small horizontal jitter so points don't sit on one x
+            jitter = (np.random.rand(len(d)) - 0.5) * 0.12
+            xs = x_pos[cat] + offsets[cohort] + jitter
+            ax.scatter(
+                xs, d[gene].values,
+                s=point_size, alpha=point_alpha, c="black", edgecolors="none", zorder=3
+            )
+
+    # tidy up
     plt.xticks(rotation=90)
-    plt.title(f"{gene} expression across TCGA and TARGET tumors)")
+    plt.title(f"{gene} expression across TCGA and TARGET tumors")
     plt.ylabel("log2(TPM + 0.001)" if subset[gene].max() < 100 else "TPM")
     plt.xlabel("Cancer type")
-    plt.legend(title="Cohort", loc='upper right')
+    # keep the boxplot legend (cohorts). It’s already correct.
     plt.tight_layout()
     plt.show()
 
+
+
+
+def TCGA_healthy_v_tumor(
+    expr_annot,
+    gene,                       # ENSG id or symbol (e.g. "FTO")
+    filter_col="_primary_site",
+    filter_value=None,
+    normals="auto",             # 'auto' | 'tcga' | 'gtex' | 'both'
+    add_points=True,
+    add_pvalue=True,
+    dpi=200
+):
+    # --- resolve gene ---
+    display_name = gene
+    if not gene.startswith("ENSG"):
+        # query mygene if not an Ensembl ID
+        q = mg.query(gene, scopes="symbol", fields="ensembl.gene", species="human")
+        if not q["hits"]:
+            raise KeyError(f"Could not resolve symbol '{gene}' via mygene.")
+        ens = q["hits"][0].get("ensembl", {})
+        if isinstance(ens, list):
+            ens = ens[0]
+        ensg = ens.get("gene")
+        if ensg is None:
+            raise KeyError(f"No Ensembl ID found for '{gene}'")
+    else:
+        ensg = gene
+
+    if ensg not in expr_annot.columns:
+        raise KeyError(f"{ensg} not in merged DataFrame columns.")
+
+    # --- subset dataframe ---
+    df = expr_annot[[ensg, "_sample_type", "_study", filter_col]].rename(columns={ensg: "expr"}).copy()
+
+    # apply filter
+    if filter_value and str(filter_value).lower() != "all":
+        if isinstance(filter_value, (list, tuple, set)):
+            m = False
+            for v in filter_value:
+                m = m | df[filter_col].astype(str).str.contains(str(v), case=False, na=False)
+        else:
+            m = df[filter_col].astype(str).str.contains(str(filter_value), case=False, na=False)
+        df = df.loc[m]
+
+    # define groups
+    is_tumor  = (df["_study"] == "TCGA") & (df["_sample_type"] == "Primary Tumor")
+    is_tcnorm = (df["_study"] == "TCGA") & (df["_sample_type"].isin(["Solid Tissue Normal", "Blood Derived Normal"]))
+    is_gtnorm = (df["_study"] == "GTEX")
+
+    if normals == "tcga":
+        df = df.loc[is_tumor | is_tcnorm].copy()
+        df["Group"] = np.where(is_tumor.loc[df.index], "Tumor", "Normal (TCGA)")
+        order = ["Tumor", "Normal (TCGA)"]
+    elif normals == "gtex":
+        df = df.loc[is_tumor | is_gtnorm].copy()
+        df["Group"] = np.where(is_tumor.loc[df.index], "Tumor", "Normal (GTEx)")
+        order = ["Tumor", "Normal (GTEx)"]
+    elif normals == "both":
+        df = df.loc[is_tumor | is_tcnorm | is_gtnorm].copy()
+        df["Group"] = np.where(is_tumor.loc[df.index], "Tumor",
+                        np.where(is_tcnorm.loc[df.index], "Normal (TCGA)", "Normal (GTEx)"))
+        order = ["Tumor", "Normal (TCGA)", "Normal (GTEx)"]
+    elif normals == "auto":
+        if is_tcnorm.sum() > 0:
+            df = df.loc[is_tumor | is_tcnorm].copy()
+            df["Group"] = np.where(is_tumor.loc[df.index], "Tumor", "Normal (TCGA)")
+            order = ["Tumor", "Normal (TCGA)"]
+        else:
+            df = df.loc[is_tumor | is_gtnorm].copy()
+            df["Group"] = np.where(is_tumor.loc[df.index], "Tumor", "Normal (GTEx)")
+            order = ["Tumor", "Normal (GTEx)"]
+    else:
+        raise ValueError("normals must be one of {'auto','tcga','gtex','both'}")
+
+    df = df.dropna(subset=["expr", "Group"])
+    if df["Group"].nunique() < 2:
+        raise ValueError("Not enough groups after filtering to draw a boxplot.")
+
+    # --- plot ---
+    plt.figure(dpi=dpi, figsize=(6,6))
+    ax = sns.boxplot(data=df, x="Group", y="expr", order=order, showfliers=False)
+    if add_points:
+        sns.stripplot(data=df, x="Group", y="expr", order=order, alpha=0.5, size=3)
+
+    subtitle = ""
+    if add_pvalue:
+        tumor_vals = df.loc[df["Group"] == "Tumor", "expr"].values
+        norm_label = next((g for g in order if g != "Tumor" and g in df["Group"].unique()), None)
+        if norm_label is not None:
+            norm_vals = df.loc[df["Group"] == norm_label, "expr"].values
+            if len(tumor_vals) > 0 and len(norm_vals) > 0:
+                _, p = mannwhitneyu(tumor_vals, norm_vals, alternative="two-sided")
+                subtitle = f"\nMWU p = {p:.2e} (Tumor vs {norm_label})"
+
+    filt_txt = "All" if not filter_value or str(filter_value).lower()=="all" else str(filter_value)
+    ax.set_title(f"{display_name} — {filter_col}: {filt_txt}{subtitle}")
+    ax.set_ylabel("Expression (log2, DESeq2-normalized)")
+    plt.tight_layout()
+    plt.show()
+
+    return df[["expr", "Group", "_sample_type", "_study", filter_col]].copy()
+
+def TCGA_km_plot(
+    df_surv_ready: pd.DataFrame,
+    gene: str,
+    endpoint: str = "OS",                      # one of: OS, DSS, PFI, DFI
+    filter_col: str = "primary disease or tissue",
+    filter_value: str = "Acute Myeloid Leukemia",
+    n_groups: int = 4,                         # e.g., 2 (median), 3 tertiles, 4 quartiles
+    min_per_group: int = 10,                   # ensure each KM group has enough samples
+    match: str = "exact",                      # 'exact' or 'contains' (case-insensitive)
+    dpi: int = 200
+) -> pd.DataFrame:
+    """
+    Returns the tidy DF used for KM (columns: expr, time, event, KM_Group).
+    """
+    ensg = _symbol_to_ensg(gene)
+    time_col, event_col = f"{endpoint}.time", endpoint
+    missing = [c for c in [ensg, time_col, event_col, filter_col] if c not in df_surv_ready.columns]
+    if missing:
+        raise KeyError(f"Missing required columns: {missing}")
+
+    # --- subset to one cancer/diagnosis ---
+    col = df_surv_ready[filter_col].astype(str)
+    if match == "contains":
+        mask = col.str.contains(str(filter_value), case=False, na=False)
+    else:  # exact
+        mask = col.str.casefold() == str(filter_value).casefold()
+    df = df_surv_ready.loc[mask, [ensg, time_col, event_col]].copy()
+    if df.empty:
+        raise ValueError(f"No rows match {filter_col} == '{filter_value}' (match='{match}').")
+
+    # --- coerce & clean ---
+    df.rename(columns={ensg: "expr", time_col: "time", event_col: "event"}, inplace=True)
+    df["time"]  = pd.to_numeric(df["time"], errors="coerce")
+    df["event"] = pd.to_numeric(df["event"], errors="coerce")
+    df = df.dropna(subset=["expr", "time", "event"])
+    df = df.loc[df["time"] > 0]
+    if df.empty:
+        raise ValueError("No data left after cleaning (expr/time/event).")
+
+    # --- make quantile groups robust to ties ---
+    r = df["expr"].rank(method="average")
+    df["KM_Group"] = pd.qcut(
+        r, q=n_groups,
+        labels=[f"Q{i}" for i in range(1, n_groups+1)],
+        duplicates="drop"
+    )
+    # ensure at least 2 groups and min_per_group
+    vc = df["KM_Group"].value_counts()
+    # If any group too small, try falling back to median split
+    if (vc.min() < min_per_group) or (df["KM_Group"].nunique() < 2):
+        # fallback: median split
+        med = df["expr"].median()
+        df["KM_Group"] = np.where(df["expr"] > med, "High", "Low")
+
+    if df["KM_Group"].nunique() < 2:
+        raise ValueError("Not enough distinct groups after binning; try smaller n_groups or a broader filter.")
+
+    # --- plot ---
+    plt.figure(dpi=dpi)
+    kmf = KaplanMeierFitter()
+    order = sorted(df["KM_Group"].unique(), key=lambda x: str(x))
+    for grp in order:
+        gdf = df.loc[df["KM_Group"] == grp]
+        kmf.fit(gdf["time"], gdf["event"], label=f"{grp} (n={len(gdf)})")
+        kmf.plot_survival_function(ci_show=True)
+
+    # --- log-rank p-value ---
+    if df["KM_Group"].nunique() == 2:
+        g1, g2 = order[:2]
+        A, B = df[df["KM_Group"] == g1], df[df["KM_Group"] == g2]
+        p = logrank_test(A["time"], B["time"], A["event"], B["event"]).p_value
+    else:
+        p = multivariate_logrank_test(df["time"], df["KM_Group"], df["event"]).p_value
+
+    plt.title(f"{endpoint} - {gene} ({ensg})\n{filter_col} = {filter_value}\nlog-rank p={p:.2e}")
+    plt.xlabel("Time (days)")
+    plt.ylabel("Survival probability")
+    plt.tight_layout()
+    plt.show()
+
+    return df[["expr", "time", "event", "KM_Group"]].copy()
+
+def _symbol_to_ensg(symbol: str) -> str:
+    if symbol.upper().startswith("ENSG"):
+        return symbol
+    q = mg.query(symbol, scopes="symbol", fields="ensembl.gene", species="human")
+    if not q.get("hits"):
+        raise KeyError(f"Could not resolve symbol '{symbol}' to Ensembl ID")
+    ens = q["hits"][0].get("ensembl", {})
+    if isinstance(ens, list):
+        ens = ens[0]
+    ensg = ens.get("gene")
+    if not ensg:
+        raise KeyError(f"No Ensembl ID found for '{symbol}'")
+    return ensg
 
 #%% ===========================================================================
 # 4. Run this cell to scan for best correlations for one gene
 # =============================================================================
 
 # # Gene sets whose genes will be highlighted on the Waterfall Plot
-gene_set = KTC_GetGeneSet('splicing_factors')
-label = ', '.join(KTC_GetGeneSet('splicing_factors'))
+gene_set = KTC_GetGeneSet('GOBP_INNATE_IMMUNE_RESPONSE')
+label = 'GOBP Innate Immune Response'
 
 # Every gene in the list below ('targets') will have all gene-gene correlations to it calculated and plotted.
-targets = ['PCNA']
+targets = ['SOX11']
 
 top_n            = 10 # E.g. 10 will generate graphs for the 5 most positive and most negatively correlated genes
 for target in targets:
@@ -1291,14 +1551,14 @@ for target in targets:
 # =============================================================================
 #Overwrite 'target' and 'target2' and run this cell
 #File is saved in out_dir/[target]
-target  = 'MYC' # The expression of the gene on the 1st axis
-target2 = 'TONSL' # The expression of the gene on the 2nd axis
+target  = 'KDM6B' # The expression of the gene on the 1st axis
+target2 = 'SPI1' # The expression of the gene on the 2nd axis
 show_equation    = False
-split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
+split_by_subtype = True # Instead of making one graph for all patients, make one expression graph for patients of each subtype
 set_lim_0        = False
 subanalysis_do   = False # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
-subanalysis_col  = 'Subtype' # This column in the clinical data will be used to separate patients into two groups
-subanalysis_hit  = 'SPI1' # This value in the column above will be used to separate patients into two groups
+subanalysis_col  = 'Event.Type' # This column in the clinical data will be used to separate patients into two groups
+subanalysis_hit  = 'Relapse' # This value in the column above will be used to separate patients into two groups
 pval_scientific  = True
 top_n_residuals  = 0
 
@@ -1318,26 +1578,26 @@ for target, target2 in gene_combinations:
 # 6. Analyze levels of expression across clinical parameters
 # =============================================================================
 
-clin_col   = 'ETP.STATUS' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
-gene       = 'TYMS' # The gene whose expression you want to track
+clin_col   = 'Subtype' #Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
+gene       = 'KDM6B' # The gene whose expression you want to track
 palette    = 'gray'  # The colors used in the graph. Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
 dotcolor   = 'white' # The colors of the dots on top of the boxplots
 fontsize   = 12 # The size of the text items
 #order      = ['ETP', 'Near-ETP', 'Non-ETP'] # Specify the order. Set to None or make sure the items are represented in the clin_col
 order      = None
 set_ylim_0 = False # Force the 2nd axis to include 0
-write_file = True # Write the graph to a file. Will be written to out_dir
-list_n     = True # provide the number in each category
+write_file = False # Write the graph to a file. Will be written to out_dir
+list_n     = False # provide the number in each category
 sort_median= True
 
 plot_type  = 'boxplot' # 'boxplot' or 'violinplot'
 
-do_stats   = True # Perform a statistical analysis and include asterisks in the plot
+do_stats   = False # Perform a statistical analysis and include asterisks in the plot
 stat_test  = 'Mann-Whitney' # 't-test_ind' or 'Mann-Whitney''
-stat_text  = 'star' # 'star' for asterisks, 'full', for p-value
+stat_text  = 'full' # 'star' for asterisks, 'full', for p-value
 
 do_binary  = True
-hit_binary = 'ETP'
+hit_binary = 'ETP-like'
 
 mut_show   = False
 mut_gene   = 'MYCN'
@@ -1346,7 +1606,7 @@ mut_col    = 'red'
 mut_mark   = "."
 mut_mark_s = 150
 
-fig_size   = (4.5, 6) # width, height
+fig_size   = (6, 6) # width, height
 dpi        = 200
 
 SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _palette=palette, _dotcolor=dotcolor, _fontsize=fontsize, set_ylim_0=set_ylim_0, list_n=list_n, sort_median=sort_median, do_binary=do_binary, hit_binary=hit_binary, order=order, mut_show=mut_show, mut_gene=mut_gene, mut_aa=mut_aa, mut_col=mut_col,mut_mark=mut_mark, mut_mark_s=mut_mark_s, stat_test=stat_test, stat_text=stat_text, fig_size=fig_size, dpi=dpi, plot_type=plot_type)
@@ -1370,8 +1630,12 @@ for cc in clin_cols:
 # 7. Polonen - Generate a Kaplan Meier plot of event-free survival for one gene
 # =============================================================================
 
-gene = 'TONSL'
+gene = 'MNS1'
 KaplanMeier(gene, n_groups=2)
+
+
+
+
 
 #%% ===========================================================================
 # 8. Polonen - Generate a Kaplan Meier plot for all clinical parameters
@@ -1380,6 +1644,8 @@ KaplanMeier(gene, n_groups=2)
 # Run for each clinical column
 clin_cols = ['Classifying Driver', 'ETP.STATUS', 'Sex', 'Race', 'CNS.Status', 'Insurance', 
              'Treatment.Arm', 'Subtype', 'Subsubtype', 'IP Status']
+
+clin_cols = ['Subtype']
 
 for col in clin_cols:
     KaplanMeier_clinical(col)
@@ -1394,7 +1660,7 @@ for col in clin_cols:
 # 9. Our own cell line MS data - Compare gene expression level trends
 # =============================================================================
 
-protein_x = 'NOTCH1'
+protein_x = 'EZH2'
 protein_y = 'NAMPT'
 Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_MS)
 
@@ -1404,11 +1670,11 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 # =============================================================================
 
 Grapher_CCLR(
-    gene_x        = 'NOTCH1',
-    gene_y        = 'NAMPT',
+    gene_x        = 'CD70',
+    gene_y        = 'CD33',
     show_equation = False,
     log_scale     = False,
-    set_lim_0     = False,
+    set_lim_0     = True,
     label_points  = True,
     filter_col    = 'Hist_Subtype1',
     filter_val    = 'acute_lymphoblastic_T_cell_leukaemia'
@@ -1426,49 +1692,30 @@ for col in filter_columns:
 # 11. CCLE (cancer cell lines) data - one gene across different categories
 # =============================================================================
 
-for gene in KTC_GetGeneSet('Laura'):
-    
-    try:
-        CCLE_Boxplotter(
-            gene          = gene,
-            group_by      = 'Hist_Subtype1',
-            log_scale     = False,
-            fig_height    = 5,
-            fig_width     = 6,
-            palette       = 'gray',
-            do_stats      = False,
-            min_samples   = 5,
-            ylim          = 0,
-            include_terms = ['acute_lymphoblastic_B_cell_leukaemia', 'acute_lymphoblastic_T_cell_leukaemia', 'acute_myeloid_leukaemia'],
-            )
-        
-        CCLE_Boxplotter(
-            gene          = gene,
-            group_by      = 'Hist_Subtype1',
-            log_scale     = False,
-            fig_height    = 5,
-            fig_width     = 15,
-            palette       = 'gray',
-            do_stats      = False,
-            min_samples   = 5,
-            ylim          = 0,
-            highlight_labels=['acute_lymphoblastic_B_cell_leukaemia', 'acute_lymphoblastic_T_cell_leukaemia', 'acute_myeloid_leukaemia']
-            )
-    except:
-        print(f'failed for {gene}')
-
+CCLE_Boxplotter(
+    gene          = 'DHFR',
+    group_by      = 'Hist_Subtype1',
+    log_scale     = False,
+    fig_height    = 5,
+    fig_width     = 6,
+    palette       = 'gray',
+    do_stats      = False,
+    min_samples   = 5,
+    ylim          = 0,
+    include_terms = ['acute_lymphoblastic_B_cell_leukaemia', 'acute_lymphoblastic_T_cell_leukaemia', 'acute_myeloid_leukaemia'],
+    )
 
 #%% ===========================================================================
 # 12. Plot the distribtution of expression levels in patients for one gene
 # =============================================================================
 
-Plot_Density('TONSL')
+Plot_Density('XIST')
 
 #%% ===========================================================================
 # 13. Mutation_Barplotter (investigates mutations based on expression levels)
 # =============================================================================
 
-gene_mut   = 'NOTCH1' #The gene whose mutations you are interested in
+gene_mut   = 'RB1' #The gene whose mutations you are interested in
 mut_aa     = None #The mutation you are interested in (e.g. 'L72P')
 gene_split = 'NOTCH1' # The gene used to split the population
 cutoff     = 13.36 # THe expression level used to split the population (investigate with Plot_Density)
@@ -1481,4 +1728,43 @@ Mutation_Barplotter(gene_mut, gene_split, cutoff, mut_aa, plot_abs=True)
 # Plotting gene expression levels across many cancers (TARGET + TCGA)
 # =============================================================================
 
-TCGA_TARGET_expression("TONSL")
+TCGA_TARGET_expression("CD33", figsize=(10,3), filter_diseases=["Neuroblastoma","breast invasive carcinoma", 'acute myeloid leukemia', 'Acute Lymphoblastic Leukemia', 'Acute Myeloid Leukemia, Induction Failure Subproject', 'AML'])
+
+#%% =============================================================================
+# TCGA healthy v tumor
+# =============================================================================
+
+for col in df_TCGA_expr:
+    if not col.startswith("ENSG") and not col.startswith("PATIENT"):
+        print(f"\n---# {col} #---")
+        vc = df_TCGA_expr[col].value_counts(dropna=True)
+        for val, count in vc.items():
+            print(f"{val}\t{count}")
+
+
+_ = TCGA_healthy_v_tumor(
+    df_TCGA_expr,
+    gene='HNRNPC',
+    filter_col="primary disease or tissue",
+    filter_value="Liver Hepatocellular Carcinoma",
+    normals="auto",
+    dpi=200
+)
+
+#%% ===========================================================================
+# TCGA KM
+# =============================================================================
+
+
+
+_ = TCGA_km_plot(
+    df_surv_ready,
+    gene='HNRNPC',
+    endpoint="OS",
+    filter_col="primary disease or tissue",
+    filter_value="Breast Invasive Carcinoma",
+    n_groups=2,
+    min_per_group=10,
+    match="exact",
+    dpi=200
+)
