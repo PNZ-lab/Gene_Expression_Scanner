@@ -3,6 +3,7 @@ The purpose of this script is to explore correlations between genes in the Polon
 1. Searching the Polonen 2024 dataset for gene-to-gene correlations and contrast gene expression to clinical parameters.
 2. Searching the CCLE cell line dataset for gene-to-gene correlations and contrast gene expression to clinical parameters.
 3. Searching our own cell line proteomics for gene-to-gene correlations.
+4. Searching TCGA for expression levels across cancers and healthy vs tumor tissues
 
 The script itself is divided into multiple sections (using lines starting with "#%%"):
 
