@@ -327,3 +327,6 @@ point_color  = 'black'
 ```
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/b73daf86-c9a5-4f22-95c3-14cdf8d73749">
+
+## Section 17 - KM plots using Pölönen expression data AND clinical data
+This Section loops over all the available clinical information in the Pölönen cohort, splits the cohort in n groups using the levels of expression of a gene and plots a KM plot for the two subpopulations.
