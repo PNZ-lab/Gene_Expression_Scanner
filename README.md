@@ -289,9 +289,44 @@ plot_abs   = True
 
 <img width="450" alt="image" src="https://github.com/user-attachments/assets/5c6cd53f-e425-455c-8dfa-d2260b4976e5">
 
+## Section 14 - Plot a median shift rank graph
+Here, median expression levels of all genes are calculated for the entire Pölönen cohort. The same is done for a subset and we plot the relative increase.
 
+```
+clin_col        = 'Subtype'
+clin_hit        = "LMO2 γδ-like"
+stat            = 'median' # median, Q1, Q2
+highlight_genes = ['SOX11', 'SOX13']
+list_gene       = None
+suffix          = 'all genes'
+```
 
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/0b4acd63-f86c-4c23-8e77-ae1ff812e0e5">
 
+## Section 15 - Plot expression levels across many cancers using TCGA+TARGET
+```
+gene            = 'BRCA1'
+filter_diseases = None
+point_alpha     = 0.2
+point_size      = 10
+figsize         = (12,4)
+```
 
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/23799ccb-3da4-40de-b8b1-6e72251ae6e4">
 
+## Section 16 - TCGA: Expression in healthy versus tumor
+```
+gene         = 'SNRPB'
+filter_col   = "primary disease or tissue"
+filter_value ="Breast Invasive Carcinoma"
+normals      = 'auto'
+dpi          = 200
+add_points   = True
+add_pvalue   = True
+point_color  = 'black'
+```
 
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/b73daf86-c9a5-4f22-95c3-14cdf8d73749">
+
+## Section 17 - KM plots using Pölönen expression data AND clinical data
+This Section loops over all the available clinical information in the Pölönen cohort, splits the cohort in n groups using the levels of expression of a gene and plots a KM plot for the two subpopulations.
