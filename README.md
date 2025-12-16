@@ -326,4 +326,4 @@ add_pvalue   = True
 point_color  = 'black'
 ```
 
-
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/b73daf86-c9a5-4f22-95c3-14cdf8d73749">
