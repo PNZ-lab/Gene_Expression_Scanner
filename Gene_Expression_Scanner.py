@@ -66,6 +66,7 @@ from statannotations.Annotator import Annotator
 from sklearn.linear_model import LinearRegression
 
 files_directory = '/Volumes/kachrist/shares/cmgg_pnlab/Kasper/Data/Interesting_Lists' #Directory where files for clinical and gene expression are stored
+files_directory = '/Users/kachrist/Desktop/Interesting_Lists_Desktop' #Directory where files for clinical and gene expression are stored
 out_dir         = '/Users/kachrist/Desktop/out_dir' # Directory where files and images are written. Subdirectories for individual genes are created
 
 #Initialization
@@ -84,6 +85,7 @@ df_M4_pathway            = pd.read_csv(os.path.join(files_directory, "PeCan_M4_p
 df_M5_allesions_genes    = pd.read_csv(os.path.join(files_directory, "PeCan_M5_Allesions_genes.csv"))
 df_M5_allesions_variants = pd.read_csv(os.path.join(files_directory, "PeCan_M5_Allesions_variants.csv"))
 df_M7_IP                 = pd.read_csv(os.path.join(files_directory, "PeCan_M7_IP.csv"))
+df_ST3                   = pd.read_excel(os.path.join(files_directory, 'Polonen_Extended_Data.xlsx'), sheet_name='ST3_Sample_Annotations')
 df_wgs                   = pd.read_excel(os.path.join(files_directory, 'Polonen_Extended_Data.xlsx'), sheet_name='ST14_Alterations.SNVIndel')
 
 print("Loading cell line MS data...")
@@ -130,7 +132,7 @@ collapse_binary_columns(df_M7_IP, "IP Status")
 df_list = [
     df_annot, df_M0_clinical, df_M1_classifying_driver, df_M2_ETP_status, 
     df_M3_genetic_subtype, df_M3_subsubtype, df_M3_subtype, df_M4_pathway, 
-    df_M5_allesions_genes, df_M5_allesions_variants, df_M7_IP
+    df_M5_allesions_genes, df_M5_allesions_variants, df_M7_IP, df_ST3
 ]
 
 # Convert patient identifiers into index for all dataframes
@@ -613,7 +615,7 @@ def SubsetBoxplotter(
                    line_height=0.02, line_offset=0.02, text_offset=0.01,
                    verbose=0)
         annotator.configure(**cfg)
-        annotator.hide_non_significant = True
+        annotator.hide_non_significant = False
         annotator.apply_and_annotate()
 
         # 3) Ensure there's headroom for the stars
@@ -1799,7 +1801,7 @@ def rank_median_shift_scatter(
 
         plt.axhline(0, linestyle="--", linewidth=1)
         plt.xlabel(f"Rank (by relative {label} shift)")
-        plt.ylabel(f"Relative {label} shift")
+        plt.ylabel(f"Relative {label} shift (%)")
         plt.title(f"{label} shift: {subtype_label} - {suffix}")
         plt.tight_layout()
 
@@ -1815,7 +1817,7 @@ def rank_median_shift_scatter(
 # =============================================================================
 # Overwrite the contents of targets and run this cell
 
-targets = ['ATP6AP2']
+targets = ['SOX11']
 show_breakpoint  = True # Identify and label breakpoints with Kneedle
 gene_set = []
 label = ''
@@ -1842,14 +1844,14 @@ for target in targets:
 # =============================================================================
 #Overwrite 'target' and 'target2' and run this cell
 #File is saved in out_dir/[target]
-target  = 'HNRNPC' # The expression of the gene on the 1st axis
-target2 = 'AKT1' # The expression of the gene on the 2nd axis
+target  = 'SOX11' # The expression of the gene on the 1st axis
+target2 = 'MYCN' # The expression of the gene on the 2nd axis
 show_equation    = False
 split_by_subtype = False # Instead of making one graph for all patients, make one expression graph for patients of each subtype
 set_lim_0        = False
-subanalysis_do   = False # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
-subanalysis_col  = 'Event.Type' # This column in the clinical data will be used to separate patients into two groups
-subanalysis_hit  = 'Relapse' # This value in the column above will be used to separate patients into two groups
+subanalysis_do   = True # Triggers the subanalysis: Make a new red line on the plot for a subset of the patients. Requires the next two folloding data.
+subanalysis_col  = 'TCR.Rearrangement' # This column in the clinical data will be used to separate patients into two groups
+subanalysis_hit  = 'TCRG,TCRD' # This value in the column above will be used to separate patients into two groups
 pval_scientific  = False
 top_n_residuals  = 0
 
@@ -1870,13 +1872,13 @@ for target, target2 in gene_combinations:
 # =============================================================================
 
 clin_col   = 'Subtype' # Classifying Driver, ETP.STATUS, Sex, Race, CNS.Status, Insurance, Treatment.Arm, Subtype, Subsuptype, IP Status
-gene       = 'TBX21' # The gene whose expression you want to track
-palette    = 'Set1'  # The colors used in the graph. Eg. gray, Set1, Pastel1. Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
+gene       = 'SOX11' # The gene whose expression you want to track
+palette    = 'gray'  # The colors used in the graph. Eg. gray, Set1, Pastel1. Choose from: https://www.practicalpythonfordatascience.com/ap_seaborn_palette
 dotcolor   = 'white' # The colors of the dots on top of the boxplots
 fontsize   = 12 # The size of the text items
 order      = None
 set_ylim_0 = False # Force the 2nd axis to include 0
-write_file = True # Write the graph to a file. Will be written to out_dir
+write_file = False # Write the graph to a file. Will be written to out_dir
 list_n     = False # provide the number in each category
 sort_median= True
 
@@ -1886,7 +1888,7 @@ do_stats   = False # Perform a statistical analysis and include asterisks in the
 stat_test  = 't-test_ind' # 't-test_ind' or 'Mann-Whitney''
 stat_text  = 'full' # 'star' for asterisks, 'full', for p-value
 
-do_binary  = True
+do_binary  = False
 hit_binary = 'LMO2 γδ-like'
 
 mut_show   = False
@@ -1907,7 +1909,7 @@ SubsetBoxplotter(gene, clin_col, do_stats=do_stats, write_file=write_file, _pale
 # 6b Polonen - Create a plot for all categories for a set of genes
 # =============================================================================
 
-clin_cols = ['Classifying Driver', 'ETP.STATUS', 'Sex', 'Race', 'CNS.Status', 'Insurance', 'Treatment.Arm', 'Subtype', 'Subsuptype', 'IP Status']
+clin_cols = ['Classifying Driver', 'ETP.STATUS', 'Sex', 'Race', 'CNS.Status', 'Insurance', 'Treatment.Arm', 'Subtype', 'Subsuptype', 'IP Status', ]
 genes     = ['KDM6B']
 for cc in clin_cols:
     for gene in genes:
@@ -1918,7 +1920,7 @@ for cc in clin_cols:
 #%% ===========================================================================
 # 7. Polonen - Generate a Kaplan Meier plot of event-free survival for one gene
 # =============================================================================
-gene = 'ATP6AP2'
+gene = 'SOX11'
 
 KaplanMeier(gene, n_groups=2, KM_ymin_0=True)
 
@@ -1928,7 +1930,7 @@ KaplanMeier(gene, n_groups=2, KM_ymin_0=True)
 
 # Run for each clinical column
 clin_cols = ['Classifying Driver', 'ETP.STATUS', 'Sex', 'Race', 'CNS.Status', 'Insurance', 
-             'Treatment.Arm', 'Subtype', 'Subsubtype', 'IP Status']
+             'Treatment.Arm', 'Subtype', 'Subsubtype', 'IP Status', 'ST3_Sample_Annotations']
 
 # clin_cols = ['Classifying Driver']
 
@@ -1955,15 +1957,15 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 # =============================================================================
 
 Grapher_CCLR(
-    gene_x        = 'METTL3',
-    gene_y        = 'TAF1',
+    gene_x        = 'SOX11',
+    gene_y        = 'MYCN',
     show_equation = False,
     log_scale     = False,
     set_lim_0     = False,
     label_points  = True,
     filter_col    = 'Hist_Subtype1',
-    # filter_val    = 'acute_lymphoblastic_T_cell_leukaemia',
-    filter_val    = 'acute_myeloid_leukaemia'
+    filter_val    = 'acute_lymphoblastic_T_cell_leukaemia',
+    # filter_val    = 'acute_myeloid_leukaemia'
     )
 
 print("\n[Filter Options]")
