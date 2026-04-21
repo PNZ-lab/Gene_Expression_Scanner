@@ -403,8 +403,11 @@ def summarize_hi_lo(
 
     return summary
 
-# %%BeatAMLExplorer
-gene = 'MYCN'
+#%% =============================================================================
+# All for one gene
+# =============================================================================
+
+gene = 'EZH2'
 
 bx = BeatAMLExplorer(base_dir=in_path)
 bx.load_expression()
@@ -426,4 +429,132 @@ summarize_hi_lo(bx, gene, top_inhibitor)
 
 
 expr = bx.expr if bx.expr is not None else bx.load_expression()
+
+
+
+#%% =============================================================================
+# Calculate all genes to all drugs
+# =============================================================================
+
+# BeatAMLExplorer
+import sys
+from tqdm import tqdm
+
+# -----------------------
+# Setup
+# -----------------------
+bx = BeatAMLExplorer(base_dir=in_path)
+bx.load_expression()
+bx.load_probit()
+bx.load_optional_annotations()
+bx.build_drug_long()  # build once
+
+expr = bx.expr
+
+# Gene list: use display_label (symbols). Drop blanks/NA.
+gene_col = "display_label"
+gene_list = (
+    expr[gene_col]
+    .dropna()
+    .astype(str)
+    .str.strip()
+)
+gene_list = gene_list[gene_list != ""].unique().tolist()
+
+print("N genes (unique symbols):", len(gene_list))
+print("Example:", gene_list[:10])
+
+# -----------------------
+# Scan parameters
+# -----------------------
+min_n = 25
+method = "both"
+split_high_low = True
+
+# Keep only top K drugs per gene (prevents huge memory use)
+TOPK_PER_GENE = 3
+
+all_top_hits = []
+errors = []
+
+pbar = tqdm(gene_list, desc="Scanning genes", file=sys.stdout)
+for gene in pbar:
+    pbar.set_postfix_str(gene)
+    try:
+        res = bx.gene_drug_sensitivity_scan(
+            gene=gene,
+            gene_col=gene_col,
+            min_n=min_n,
+            method=method,
+            split_high_low=split_high_low
+        )
+        if res is None or res.empty:
+            continue
+
+        # Add gene label
+        res = res.copy()
+        res.insert(0, "gene", gene)
+
+        # Choose a single "strength" column to rank within gene
+        # Prefer spearman on sens_score, else pearson on sens_score.
+        if "r_spearman_expr_sens" in res.columns:
+            res["strength"] = res["r_spearman_expr_sens"].astype(float)
+        elif "r_pearson_expr_sens" in res.columns:
+            res["strength"] = res["r_pearson_expr_sens"].astype(float)
+        else:
+            # fallback: negative corr with AUC means sensitization
+            if "r_spearman_expr_auc" in res.columns:
+                res["strength"] = (-res["r_spearman_expr_auc"].astype(float))
+            else:
+                res["strength"] = (-res["r_pearson_expr_auc"].astype(float))
+
+        # Keep only the strongest TOPK per gene
+        res = res.sort_values("strength", ascending=False).head(TOPK_PER_GENE)
+
+        all_top_hits.append(res)
+
+    except Exception as e:
+        errors.append({"gene": gene, "error": repr(e)})
+
+hits_df = pd.concat(all_top_hits, ignore_index=True) if all_top_hits else pd.DataFrame()
+errors_df = pd.DataFrame(errors)
+
+print("Genes scanned:", len(gene_list))
+print("Genes with >=1 hit:", hits_df["gene"].nunique() if not hits_df.empty else 0)
+print("Errors:", len(errors_df))
+
+# -----------------------
+# Global ranking: "most sensitivity-determining"
+# -----------------------
+# This ranks across all (gene, inhibitor) pairs.
+# You can tighten thresholds to keep only very strong signals.
+if not hits_df.empty:
+    hits_df = hits_df.sort_values(["strength", "n"], ascending=[False, False]).reset_index(drop=True)
+
+    # Optional: filter for "highly correlated"
+    # e.g. keep abs(corr) >= 0.4
+    CORR_MIN = 0.4
+    hits_df = hits_df[hits_df["strength"].abs() >= CORR_MIN].reset_index(drop=True)
+
+print("\nTop 30 strongest gene–drug sensitivity associations:")
+print(hits_df.head(30))
+
+# Save results
+hits_df.to_csv(bx._path("gene_drug_scan_top_hits.csv"), index=False)
+errors_df.to_csv(bx._path("gene_drug_scan_errors.csv"), index=False)
+
+print("\nSaved:")
+print(" - gene_drug_scan_top_hits.csv")
+print(" - gene_drug_scan_errors.csv")
+
+#%%
+TOP_N = 30
+top_hits = hits_df.head(TOP_N)
+for i, row in top_hits.iterrows():
+    print(f"{i+1}/{TOP_N}: {row['gene']} vs {row['inhibitor']} "
+          f"(strength={row['strength']:.2f}, n={row['n']})")
+    bx.plot_gene_vs_drug(
+        gene=row["gene"],
+        inhibitor=row["inhibitor"],
+    )
 
