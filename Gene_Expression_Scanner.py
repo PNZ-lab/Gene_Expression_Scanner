@@ -133,18 +133,29 @@ for df in [df_gexp, df_M1_classifying_driver, df_M2_ETP_status, df_M3_genetic_su
         df.rename(columns={'Unnamed: 0': 'Gene'}, inplace=True)
 
 def collapse_binary_columns(df, new_column_name):
-    """ Collapses multiple binary indicator columns into a single categorical column. """
-    binary_columns = df.columns[df.isin([0, 1]).all()]  # Identify binary indicator columns
-    
-    def get_category(row):
-        for col in binary_columns:
-            if row[col] == 1:
-                return col  # Return the name of the column that is marked as 1
-        return 'Unknown'  # If no column is marked, assign 'Unknown'
-    
-    if len(binary_columns) > 0:
-        df[new_column_name] = df.apply(get_category, axis=1)
-        df.drop(columns=binary_columns, inplace=True)  # Remove the original binary columns
+    """Collapse indicators without losing multi-membership information."""
+    binary_columns = []
+    for col in df.columns[1:]:  # the first column is the sample identifier
+        numeric = pd.to_numeric(df[col], errors="coerce")
+        observed = set(numeric.dropna().unique())
+        all_observed_values_are_numeric = numeric.notna().sum() == df[col].notna().sum()
+        if observed and all_observed_values_are_numeric and observed.issubset({0, 1}):
+            binary_columns.append(col)
+
+    if not binary_columns:
+        return
+
+    def get_categories(row):
+        hits = tuple(
+            col for col in binary_columns
+            if pd.to_numeric(row[col], errors="coerce") == 1
+        )
+        if not hits:
+            return "Unknown"
+        return hits[0] if len(hits) == 1 else hits
+
+    df[new_column_name] = df.apply(get_categories, axis=1)
+    df.drop(columns=binary_columns, inplace=True)
 
 # Apply to all relevant dataframes
 collapse_binary_columns(df_M1_classifying_driver, "Classifying Driver")
@@ -165,6 +176,13 @@ df_list = [
 ]
 
 # Convert patient identifiers into index for all dataframes
+for source_df in df_list:
+    id_col = source_df.columns[0]
+    duplicate_ids = source_df.loc[source_df[id_col].duplicated(keep=False), id_col]
+    if not duplicate_ids.empty:
+        examples = duplicate_ids.astype(str).unique()[:5].tolist()
+        raise ValueError(f"Duplicate sample IDs in clinical source '{id_col}': {examples}")
+
 df_list = [df.set_index(df.columns[0]) for df in df_list]
 
 # Merge all dataframes while handling overlapping columns
@@ -222,6 +240,8 @@ for col, spec in bin_specs.items():
 # Reset index to keep patient identifiers as a column
 clin_df.reset_index(inplace=True)
 clin_df.rename(columns={'index': 'Patient_ID'}, inplace=True)
+if not clin_df['Patient_ID'].is_unique:
+    raise ValueError("clin_df construction violated the one-row-per-sample contract")
 
 
 print("Loading in TARGET + TCGA data...")
@@ -1055,12 +1075,17 @@ def SubsetBoxplotter(
     values = filtered_df_gexp.iloc[0].tolist()
     clin_lookup = clin_df.set_index('Patient_ID')
 
+    def _memberships(value):
+        if isinstance(value, (tuple, list, set, np.ndarray)):
+            return list(value)
+        return [value]
+
     # ========= BINARY MODE =========
     if do_binary and PECAN_col and hit_binary:
         group_labels = []
         for sample in matching_patient_ids:
             val = clin_lookup.loc[sample, PECAN_col] if sample in clin_lookup.index else None
-            group = hit_binary if val == hit_binary else 'Other'
+            group = hit_binary if hit_binary in _memberships(val) else 'Other'
             group_labels.append(group)
 
         data = pd.DataFrame({
@@ -1084,8 +1109,8 @@ def SubsetBoxplotter(
         subtype_dict = defaultdict(list)
         for i, sample in enumerate(matching_patient_ids):
             if sample in clin_lookup.index:
-                subtype = clin_lookup.loc[sample, PECAN_col]
-                subtype_dict[subtype].append((sample, values[i]))
+                for subtype in _memberships(clin_lookup.loc[sample, PECAN_col]):
+                    subtype_dict[subtype].append((sample, values[i]))
 
         records = []
         for subtype, sample_expr in subtype_dict.items():
@@ -3243,10 +3268,231 @@ for gene in test_genes:
     if gene not in all_genes:
         print(gene)
 
+
+# Adjusted lesion-expression model used by execution section 6c.
+def lesion_expression_forest_plot(
+    gene,
+    lesion_columns=("Alleles Genes", "Alleles Variants"),
+    adjust_columns=("Age.at.Diagnosis.in.Years", "Sex", "Subtype"),
+    min_present=5,
+    min_absent=20,
+    top_n=20,
+    fdr_threshold=0.05,
+    figsize=None,
+    write_files=True,
+    output_directory=None,
+    plt_show=True,
+):
+    """Estimate adjusted present-vs-absent lesion effects on gene expression.
+
+    ``clin_df`` remains one row per sample. Tuple/list-valued lesion columns are
+    expanded only while constructing each binary lesion indicator. Effects are
+    ordinary-least-squares coefficients after standardizing expression, so they
+    are expressed in expression standard-deviation units.
+    """
+    import ast
+    from scipy.stats import t as student_t
+
+    missing_columns = [col for col in lesion_columns if col not in clin_df.columns]
+    if missing_columns:
+        raise KeyError(f"Missing lesion columns in clin_df: {missing_columns}")
+    if gene not in set(df_gexp["Gene"].astype(str)):
+        raise KeyError(f"Gene not found in df_gexp: {gene}")
+
+    def memberships(value):
+        if isinstance(value, (tuple, list, set, np.ndarray)):
+            return tuple(str(item) for item in value)
+        if isinstance(value, str):
+            text = value.strip()
+            if len(text) >= 2 and text[0] in "([{\"" and text[-1] in ")]}'\"":
+                try:
+                    parsed = ast.literal_eval(text)
+                except (ValueError, SyntaxError):
+                    parsed = value
+                if isinstance(parsed, (tuple, list, set, np.ndarray)):
+                    return tuple(str(item) for item in parsed)
+            if text and text.lower() not in {"unknown", "nan", "none", "."}:
+                return (text,)
+        return tuple()
+
+    def clean_lesion_name(value):
+        text = str(value)
+        for suffix in (
+            ":All_lesions_genes", ":All_lesions_variants",
+            ":Significant_lesions", "_All_lesions_genes",
+            "_All_lesions_variants",
+        ):
+            text = text.replace(suffix, "")
+        return text.replace("_", " ").strip()
+
+    def bh_fdr(values):
+        p_values = np.asarray(values, dtype=float)
+        order = np.argsort(p_values)
+        ranked = p_values[order]
+        adjusted = ranked * len(ranked) / np.arange(1, len(ranked) + 1)
+        adjusted = np.minimum.accumulate(adjusted[::-1])[::-1]
+        result = np.empty_like(adjusted)
+        result[order] = np.clip(adjusted, 0, 1)
+        return result
+
+    # Match expression to clinical samples without duplicating clin_df rows.
+    expression_columns = [col for col in df_gexp.columns if col != "Gene"]
+    expression_row = df_gexp.loc[df_gexp["Gene"].astype(str).eq(str(gene)), expression_columns]
+    expression = expression_row.apply(pd.to_numeric, errors="coerce").mean(axis=0)
+    expression.index = expression.index.astype(str)
+
+    analysis = clin_df.copy()
+    analysis["Patient_ID"] = analysis["Patient_ID"].astype(str)
+    analysis["Expression"] = analysis["Patient_ID"].map(expression)
+    analysis = analysis.dropna(subset=["Expression"]).copy()
+    expression_sd = analysis["Expression"].std(ddof=1)
+    if not np.isfinite(expression_sd) or expression_sd == 0:
+        raise ValueError(f"Expression is constant or unavailable for {gene}")
+    analysis["Expression_SD"] = (
+        analysis["Expression"] - analysis["Expression"].mean()
+    ) / expression_sd
+
+    usable_adjust_columns = [col for col in adjust_columns if col in analysis.columns]
+    missing_adjust_columns = [col for col in adjust_columns if col not in analysis.columns]
+    if missing_adjust_columns:
+        print(f"Skipping unavailable adjustment columns: {missing_adjust_columns}")
+
+    covariates = pd.DataFrame(index=analysis.index)
+    for col in usable_adjust_columns:
+        series = analysis[col]
+        numeric = pd.to_numeric(series, errors="coerce")
+        mostly_numeric = numeric.notna().sum() >= 0.8 * series.notna().sum()
+        if mostly_numeric:
+            median = numeric.median()
+            covariates[col] = numeric.fillna(median)
+        else:
+            encoded = pd.get_dummies(
+                series.astype("string").fillna("Missing"),
+                prefix=col,
+                drop_first=True,
+                dtype=float,
+            )
+            covariates = covariates.join(encoded)
+
+    records = []
+    for lesion_column in lesion_columns:
+        member_values = analysis[lesion_column].map(memberships)
+        lesions = sorted({lesion for values in member_values for lesion in values})
+        source_label = "Gene/region lesion" if lesion_column == "Alleles Genes" else "Variant lesion"
+
+        for lesion in lesions:
+            present = member_values.map(lambda values: lesion in values).astype(float)
+            n_present = int(present.sum())
+            n_absent = int(len(present) - n_present)
+            if n_present < min_present or n_absent < min_absent:
+                continue
+
+            model = covariates.copy()
+            model.insert(0, "Lesion_present", present)
+            model.insert(0, "Intercept", 1.0)
+            y = analysis.loc[model.index, "Expression_SD"].to_numpy(dtype=float)
+            x = model.to_numpy(dtype=float)
+
+            if np.linalg.matrix_rank(x) < x.shape[1]:
+                continue
+            residual_df = len(y) - x.shape[1]
+            if residual_df <= 0:
+                continue
+
+            coefficients, _, _, _ = np.linalg.lstsq(x, y, rcond=None)
+            residuals = y - x @ coefficients
+            residual_variance = float(residuals @ residuals / residual_df)
+            covariance = residual_variance * np.linalg.inv(x.T @ x)
+            standard_error = float(np.sqrt(covariance[1, 1]))
+            effect = float(coefficients[1])
+            t_statistic = effect / standard_error
+            p_value = float(2 * student_t.sf(abs(t_statistic), residual_df))
+            ci_multiplier = float(student_t.ppf(0.975, residual_df))
+
+            records.append({
+                "lesion": lesion,
+                "display_label": f"{clean_lesion_name(lesion)} ({source_label})",
+                "source_column": lesion_column,
+                "n_present": n_present,
+                "n_absent": n_absent,
+                "effect_sd": effect,
+                "standard_error": standard_error,
+                "ci_low": effect - ci_multiplier * standard_error,
+                "ci_high": effect + ci_multiplier * standard_error,
+                "p_value": p_value,
+            })
+
+    results = pd.DataFrame(records)
+    if results.empty:
+        raise ValueError("No lesions passed the sample-count and model requirements")
+    results["fdr"] = bh_fdr(results["p_value"])
+    results = results.sort_values(["p_value", "effect_sd"], ascending=[True, False])
+
+    plotted = results.head(top_n).copy().sort_values("effect_sd", ascending=True)
+    height = max(6, 0.48 * len(plotted) + 1.8)
+    if figsize is None:
+        figsize = (11, height)
+
+    fig, ax = plt.subplots(figsize=figsize, dpi=200)
+    y_positions = np.arange(len(plotted))
+    significant = plotted["fdr"] < fdr_threshold
+    colors = np.where(significant, "#b79a65", "#2f5da8")
+
+    for y_position, (_, row), color in zip(y_positions, plotted.iterrows(), colors):
+        ax.errorbar(
+            row["effect_sd"],
+            y_position,
+            xerr=[[row["effect_sd"] - row["ci_low"]], [row["ci_high"] - row["effect_sd"]]],
+            fmt="o",
+            color=color,
+            ecolor=color,
+            markersize=8,
+            elinewidth=1.8,
+            capsize=3,
+        )
+
+    ax.axvline(0, color="#999999", linewidth=1.5)
+    ax.set_yticks(y_positions)
+    ax.set_yticklabels(plotted["display_label"])
+    ax.set_xlabel(
+        f"Adjusted difference in {gene} expression\n"
+        "(SD; lesion present vs. absent)",
+        fontweight="bold",
+    )
+    ax.set_ylabel("")
+    ax.spines[["top", "right"]].set_visible(False)
+
+    from matplotlib.lines import Line2D
+    legend_handles = [
+        Line2D([0], [0], marker="o", color="#b79a65", label=f"FDR < {fdr_threshold:g}"),
+        Line2D([0], [0], marker="o", color="#2f5da8", label=f"FDR ≥ {fdr_threshold:g}"),
+    ]
+    ax.legend(handles=legend_handles, loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=2, frameon=False)
+    fig.tight_layout()
+
+    if write_files:
+        target_directory = output_directory or out_dir
+        os.makedirs(target_directory, exist_ok=True)
+        stem = f"{gene}_adjusted_lesion_expression_forest"
+        results.to_csv(os.path.join(target_directory, f"{stem}_full.csv"), index=False)
+        for extension in ("png", "svg", "pdf"):
+            fig.savefig(
+                os.path.join(target_directory, f"{stem}.{extension}"),
+                dpi=300,
+                bbox_inches="tight",
+            )
+        print(f"Lesion forest plot and results written to: {target_directory}")
+
+    if plt_show:
+        plt.show()
+    else:
+        plt.close(fig)
+    return results, fig, ax
+
 #%% ===========================================================================
 # 4. Run this cell to scan for best correlations for one gene
 # =============================================================================
-gene            = 'MRPL35'
+gene            = 'SREBF1'
 min_target_expr = None #Usually None or 5 (threshold for null expression), change to omit expressions below this value
 show_breakpoint = True
 gene_set        = KTC_GetGeneSet('SOX11_TARGET_GENES')
@@ -3283,6 +3529,105 @@ for g, _ in top_genes:
 
 for g, _ in bottom_genes:
     Grapher(gene, g, min_target_expr=min_target_expr)
+
+
+#%% =============================================================================
+# 4b. Run the correlation analysis for every gene set in a GMT file
+# =============================================================================
+gmt_path = (
+    "/Volumes/sgoossens_researchteam/Kasper/Hannah/ExternalEvidence/data/"
+    "msigdb/msigdb_tall_btz_ven_focus.v2024.1.Hs.gmt"
+)
+
+gene            = "SREBF1"
+min_target_expr = None
+top_n           = 2
+write_files     = True
+category_mode   = "elbows"  # or "top_bottom"
+
+
+def read_gmt(gmt_file):
+    """Return {set_name: genes} from a standard name/description/genes GMT."""
+    gene_sets = {}
+    with open(gmt_file, "r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            fields = line.rstrip("\n\r").split("\t")
+            if len(fields) < 3:
+                raise ValueError(
+                    f"Malformed GMT line {line_number}: expected name, description, and genes"
+                )
+            set_name, _description, *genes = fields
+            if set_name in gene_sets:
+                raise ValueError(f"Duplicate gene-set name in GMT: {set_name}")
+            gene_sets[set_name] = list(dict.fromkeys(g for g in genes if g))
+    return gene_sets
+
+
+gmt_gene_sets = read_gmt(gmt_path)
+gmt_base_out_dir = os.path.join(out_dir, f"{gene}_GMT_gene_sets")
+os.makedirs(gmt_base_out_dir, exist_ok=True)
+expression_genes = set(df_gexp["Gene"].astype(str))
+
+gmt_results = {}
+original_out_dir = out_dir
+
+try:
+    for set_number, (set_name, genes_in_set) in enumerate(gmt_gene_sets.items(), start=1):
+        safe_set_name = "".join(
+            char if char.isalnum() or char in "._-" else "_"
+            for char in set_name
+        ).strip("_")
+        set_out_dir = os.path.join(gmt_base_out_dir, safe_set_name)
+        os.makedirs(set_out_dir, exist_ok=True)
+
+        # WaterfallPlot/WriteFile use the global out_dir; isolate each set so
+        # identically named outputs from different iterations cannot overwrite.
+        out_dir = set_out_dir
+        print(f"[{set_number}/{len(gmt_gene_sets)}] {set_name} (n={len(genes_in_set)})")
+
+        try:
+            sorted_genes, top_genes, bottom_genes = top_n_comparisons(
+                gene=gene,
+                gene_set=genes_in_set,
+                label=set_name,
+                min_target_expr=min_target_expr,
+                top_n=top_n,
+                write_files=write_files,
+                out_dir=set_out_dir,
+                category_mode=category_mode,
+            )
+            gmt_results[set_name] = {
+                "status": "ok",
+                "n_genes_in_gmt": len(genes_in_set),
+                "n_genes_in_expression": sum(
+                    gene_name in expression_genes for gene_name in genes_in_set
+                ),
+                "top_genes": ";".join(g for g, _ in top_genes),
+                "bottom_genes": ";".join(g for g, _ in bottom_genes),
+                "error": "",
+            }
+        except Exception as exc:
+            gmt_results[set_name] = {
+                "status": "failed",
+                "n_genes_in_gmt": len(genes_in_set),
+                "n_genes_in_expression": sum(
+                    gene_name in expression_genes for gene_name in genes_in_set
+                ),
+                "top_genes": "",
+                "bottom_genes": "",
+                "error": str(exc),
+            }
+            print(f"Failed: {set_name}: {exc}")
+        finally:
+            plt.close("all")
+finally:
+    out_dir = original_out_dir
+
+gmt_summary = pd.DataFrame.from_dict(gmt_results, orient="index")
+gmt_summary.index.name = "gene_set"
+gmt_summary_path = os.path.join(gmt_base_out_dir, f"{gene}_GMT_gene_set_summary.csv")
+gmt_summary.to_csv(gmt_summary_path)
+print(f"GMT summary written to: {gmt_summary_path}")
 
 
 
@@ -3420,7 +3765,7 @@ clin_cols = [
 from matplotlib.backends.backend_pdf import PdfPages
 
 
-gene = 'MRPL35'
+gene = 'SREBF1'
 out_pdf = os.path.join(out_dir, f"{gene}_clinical_covariates_violinplots.pdf")
 
 with PdfPages(out_pdf) as pdf:
@@ -3444,6 +3789,28 @@ with PdfPages(out_pdf) as pdf:
     print(f'pdf saved to: {out_pdf}')
 
 
+#%% ===========================================================================
+# 6c Polonen - Adjusted lesion associations with expression (forest plot)
+# =============================================================================
+
+# Configuration and call
+lesion_gene = "EMP1"
+lesion_adjust_columns = ("Age.at.Diagnosis.in.Years", "Sex", "Subtype")
+
+lesion_results, lesion_fig, lesion_ax = lesion_expression_forest_plot(
+    gene=lesion_gene,
+    lesion_columns=("Alleles Genes", "Alleles Variants"),
+    adjust_columns=lesion_adjust_columns,
+    min_present=5,
+    min_absent=20,
+    top_n=20,
+    fdr_threshold=0.05,
+    write_files=True,
+    output_directory=out_dir,
+    plt_show=True,
+)
+
+
 
 #%% ===========================================================================
 # 7. Polonen - Generate a Kaplan Meier plot of event-free survival for one gene
@@ -3454,6 +3821,7 @@ genes = ["B4GALT5", "FANCB", "SARAF", "R3HCC1L", "TMCC3", "TOB2", "ZNF845", "SRE
 #Ksenia dn
 genes = ["TCEA2", "GPSM3", "RINL", "QPCTL", "RAB5IF", "MRPL35", "ELF4", "RDH10", "IFIT3", "PPP1R13B", "HPX", "MLXIP", "NTAQ1", "G6PC3"]
 
+genes = ['TYROBP']
 
 for gene in genes:
     try:
@@ -3503,7 +3871,7 @@ Grapher_MSpr1(protein1=protein_x, protein2=protein_y, df_msdataset=df_cell_line_
 # 10. CCLE density plot
 # =============================================================================
 
-gene          = 'SOX11'
+gene          = 'SREBF1'
 filter_col    = 'OncotreeSubtype' # 'DepmapModelType'
 filter_val    = 'T-Cell Acute Lymphoblastic Leukemia' # 'Acute Myeloid Leukemia', T-Cell Acute Lymphoblastic Leukemia
 label_col     = "StrippedCellLineName"   # nicer than ModelID usually
@@ -3521,6 +3889,7 @@ Grapher_CCLE_density(gene=gene, filter_col=filter_col, filter_val=filter_val, lo
 
 print("\n[Filter Options]")
 filter_columns = ['OncotreeLineage','OncotreePrimaryDisease', 'OncotreeSubtype', 'OncotreeCode']
+filter_columns = ['OncotreeSubtype', 'OncotreeCode']
 for col in filter_columns:
     if col in df_cl.columns:
         print(f"\n\t{col}:")
@@ -3532,14 +3901,14 @@ for col in filter_columns:
 # =============================================================================
 
 Grapher_CCLE(
-    gene_x        = 'EIF2AK4',
-    gene_y        = 'MYB',
+    gene_x        = 'SOX11',
+    gene_y        = 'SMARCA4',
     show_equation = False,
     log_scale     = False,
     set_lim_0     = False,
     label_points  = True,
     filter_col    = 'OncotreeSubtype',
-    filter_val    = 'Acute Myeloid Leukemia', # 'Acute Myeloid Leukemia', 'T-Cell Acute Lymphoblastic Leukemia'
+    filter_val    = 'B-Cell Acute Lymphoblastic Leukemia', # 'Acute Myeloid Leukemia', 'T-Cell Acute Lymphoblastic Leukemia'
     # filter_val    = 'acute_myeloid_leukaemia'
     )
 
@@ -3549,16 +3918,16 @@ Grapher_CCLE(
 # =============================================================================
 
 CCLE_Boxplotter(
-    gene          = 'EIF2AK4',
-    group_by      = 'OncotreeCode',
+    gene          = 'ASNS',
+    group_by      = 'OncotreeSubtype',
     log_scale     = False,
-    fig_height    = 5,
-    fig_width     = 30,
-    palette       = 'gray',
+    fig_height    = 7,
+    fig_width     = 4,
+    palette       = 'Pastel2',
     do_stats      = False,
     min_samples   = 1,
     ylim          = 0,
-    include_terms = ['TALL'],
+    include_terms = ['Acute High-Grade Serous Ovarian Cancer', 'Serous Ovarian Cancer', 'Clear Cell Ovarian Cancer', 'Mucinous Ovarian Cancer', 'Endometrioid Ovarian Cancer'],
     add_scatter   = True
     )
 
@@ -3566,7 +3935,7 @@ CCLE_Boxplotter(
 # 13. Plot the distribtution of expression levels in patients for one gene
 # =============================================================================
 
-gene='SOX11'
+gene='SREBF1'
 
 # Optional plotting controls
 plot_minmax       = False
@@ -3648,7 +4017,7 @@ df_rms = rank_median_shift_scatter(clin_col=clin_col, clin_hit=clin_hit, highlig
 # 16. TARGET + TCGA expression levels across many cancers
 # =============================================================================
 
-gene            = 'NAPRT'
+gene            = 'EMP1'
 filter_diseases = None
 point_alpha     = 0.2
 point_size      = 10
@@ -3671,7 +4040,7 @@ for col in df_TCGA_expr:
 # 17. TCGA healthy v tumor
 # =============================================================================
 
-gene         = 'ASNS'
+gene         = 'EMP1'
 filter_col   = "_primary_site"
 filter_value = "Ovary"
 normals      = 'auto'
@@ -3698,7 +4067,7 @@ clin_cols = ['Subtype']
 
 ['RUNX1', 'STMN1', 'TCF3', 'NCSTN', 'GATA3']
 
-gene = 'NCSTN'
+gene = 'EMP1'
 
 for col in clin_cols:
     pvals, tables = KaplanMeier_expression_clinical(
@@ -3713,8 +4082,8 @@ for col in clin_cols:
 # 19. Correlating expressions of a gene above a certain threshold to clinical parameters
 # =============================================================================
 
-gene = 'SOX11'
-cutoff = 9.55
+gene = 'SREBF1'
+cutoff = 10.85
 quantile = None # Alternative to cutoff E.g. 0.9 = top 10%
 max_categories = 20 #Skip a column with too many unique values
 min_group_size = 10 #Fail if we have too few qualifying samples
@@ -3723,7 +4092,7 @@ df_clinScan = ClinicalCorrelator(gene=gene, cutoff=cutoff, quantile=quantile, ma
 
 
 #%% ===========================================================================
-# 20. Kaplan-Meier per subtype — stratified by SOX11 expression
+# 20. Kaplan-Meier per subtype — stratified by gene expression
 # =============================================================================
 # For each genetic subtype in the Pölönen dataset, plot a KM curve with
 # patients split into SOX11-High vs SOX11-Low (within-subtype median split).
